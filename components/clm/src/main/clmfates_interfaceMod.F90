@@ -108,7 +108,6 @@ module CLMFatesInterfaceMod
    use FatesInterfaceMod     , only : allocate_bcout
    use FatesInterfaceMod     , only : SetFatesTime
    use FatesInterfaceMod     , only : set_fates_ctrlparms
-   use FatesInterfaceMod     , only : InitPARTEHGlobals
 
    use FatesHistoryInterfaceMod, only : fates_history_interface_type
    use FatesRestartInterfaceMod, only : fates_restart_interface_type
@@ -122,6 +121,7 @@ module CLMFatesInterfaceMod
    use EDInitMod             , only : init_site_vars
    use EDInitMod             , only : init_patches
    use EDInitMod             , only : set_site_properties
+   use EDInitMod             , only : InitFatesGlobals
    use EDPftVarcon           , only : EDpftvarcon_inst
    use EDSurfaceRadiationMod , only : ED_SunShadeFracs, ED_Norman_Radiation
    use EDBtranMod            , only : btran_ed, &
@@ -477,7 +477,7 @@ contains
          call this%init_soil_depths(nc)
          
          if (use_fates_planthydro) then
-            call InitHydrSites(this%fates(nc)%sites,this%fates(nc)%bc_in,numpft_fates)
+            call InitHydrSites(this%fates(nc)%sites,this%fates(nc)%bc_in)
          end if
 
          if( this%fates(nc)%nsites == 0 ) then
@@ -501,13 +501,10 @@ contains
       end do
       !$OMP END PARALLEL DO
 
-      ! This will initialize all globals associated with the chosen
-      ! Plant Allocation and Reactive Transport hypothesis. This includes
-      ! mapping tables and global variables. These will be read-only
-      ! and only required once per machine instance (thus no requirements
-      ! to have it instanced on each thread
-      
-      call InitPARTEHGlobals()
+      ! This will initialize all FATES globals,
+      ! particular PARTEH and HYDRO globals
+
+      call InitFatesGlobals(masterproc)
 
       call this%init_history_io(bounds_proc)
       
@@ -667,7 +664,7 @@ contains
          if(use_fates_planthydro)then
             this%fates(nc)%bc_in(s)%hksat_sisl(1:nlevsoil)  = soilstate_inst%hksat_col(c,1:nlevsoil)
             this%fates(nc)%bc_in(s)%watsat_sisl(1:nlevsoil) = soilstate_inst%watsat_col(c,1:nlevsoil)
-            this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil) = spval !soilstate_inst%watres_col(c,1:nlevsoil)
+            this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil) = soilstate_inst%watmin_col(c,1:nlevsoil)
             this%fates(nc)%bc_in(s)%sucsat_sisl(1:nlevsoil) = soilstate_inst%sucsat_col(c,1:nlevsoil)
             this%fates(nc)%bc_in(s)%bsw_sisl(1:nlevsoil)    = soilstate_inst%bsw_col(c,1:nlevsoil)
             this%fates(nc)%bc_in(s)%h2o_liq_sisl(1:nlevsoil) =  col_ws%h2osoi_liq(c,1:nlevsoil)
@@ -1177,6 +1174,22 @@ contains
                      nlevsoil = this%fates(nc)%bc_in(s)%nlevsoil
                      this%fates(nc)%bc_in(s)%hksat_sisl(1:nlevsoil) = &
                           soilstate_inst%hksat_col(c,1:nlevsoil)
+
+                     this%fates(nc)%bc_in(s)%watsat_sisl(1:nlevsoil) = &
+                          soilstate_inst%watsat_col(c,1:nlevsoil)
+                     
+                     this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil) = &
+                          soilstate_inst%watmin_col(c,1:nlevsoil)
+                     
+                     this%fates(nc)%bc_in(s)%sucsat_sisl(1:nlevsoil) = &
+                          soilstate_inst%sucsat_col(c,1:nlevsoil)
+                     
+                     this%fates(nc)%bc_in(s)%bsw_sisl(1:nlevsoil) = &
+                          soilstate_inst%bsw_col(c,1:nlevsoil)
+                     
+                     this%fates(nc)%bc_in(s)%h2o_liq_sisl(1:nlevsoil) = &
+                          waterstate_inst%h2osoi_liq_col(c,1:nlevsoil)
+                     
                   end do
                   
                   call RestartHydrStates(this%fates(nc)%sites,  &
@@ -1273,8 +1286,8 @@ contains
                  this%fates(nc)%bc_in(s)%watsat_sisl(1:nlevsoil) = &
                       soilstate_inst%watsat_col(c,1:nlevsoil)
                  
-                 this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil) = spval !&
-!                      soilstate_inst%watres_col(c,1:nlevsoil)
+                 this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil) = &
+                      soilstate_inst%watmin_col(c,1:nlevsoil)
 
                  this%fates(nc)%bc_in(s)%sucsat_sisl(1:nlevsoil) = &
                       soilstate_inst%sucsat_col(c,1:nlevsoil)
@@ -2326,8 +2339,8 @@ contains
             soilstate_inst%smpmin_col(c)
       this%fates(nc)%bc_in(s)%watsat_sisl(1:nlevsoil)    = &
             soilstate_inst%watsat_col(c,1:nlevsoil) 
-      this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil)    = spval !&
-!            soilstate_inst%watres_col(c,1:nlevsoil)
+      this%fates(nc)%bc_in(s)%watres_sisl(1:nlevsoil)    = &
+           soilstate_inst%watmin_col(c,1:nlevsoil)
       this%fates(nc)%bc_in(s)%sucsat_sisl(1:nlevsoil)     = &
             soilstate_inst%sucsat_col(c,1:nlevsoil)
       this%fates(nc)%bc_in(s)%bsw_sisl(1:nlevsoil)        = &
