@@ -27,7 +27,7 @@ contains
     ! !USES:
     use clm_varctl       , only: co2_type, co2_ppmv, iulog, use_c13, create_glacier_mec_landunit, &
                                  metdata_type, metdata_bypass, metdata_biases, co2_file, aero_file
-    use clm_varctl       , only: const_climate_hist, add_temperature, add_co2, use_cn
+    use clm_varctl       , only: const_climate_hist, add_temperature, add_co2, use_cn, use_fates
     use clm_varctl       , only: startdate_add_temperature, startdate_add_co2
     use clm_varcon       , only: rair, o2_molar_const, c13ratio
     use clm_time_manager , only: get_nstep, get_step_size, get_curr_calday, get_curr_date 
@@ -703,8 +703,9 @@ contains
         if (yr .lt. 1850 .or. const_climate_hist) nindex(1:2) = 2
         if (yr .ge. 2010 .and. .not. const_climate_hist) nindex(1:2) = 161
       
-        if (use_cn) then 
-          if (atm2lnd_vars%loaded_bypassdata == 0 .or. (mon .eq. 1 .and. day .eq. 1 .and. tod .eq. 0)) then  
+        model_filter: if (use_cn .or. use_fates) then 
+
+           if (atm2lnd_vars%loaded_bypassdata == 0 .or. (mon .eq. 1 .and. day .eq. 1 .and. tod .eq. 0)) then  
             if (masterproc .and. i .eq. 1) then 
               ! Read pop_dens streams namelist to get filename
               nu_nml = getavu()
@@ -746,7 +747,7 @@ contains
               call mpi_bcast (smap05_lon, 720, MPI_REAL8, 0, mpicom, ier)
               call mpi_bcast (smap05_lat, 360, MPI_REAL8, 0, mpicom, ier)
             end if
-          end if
+         end if
 
           !figure out which point to get
           if (atm2lnd_vars%loaded_bypassdata == 0) then 
@@ -767,7 +768,7 @@ contains
                   end if
               end do
             end do
-          end if
+         end if
           !get weights for interpolation
           wt1(1) = 1._r8 - (thiscalday -1._r8)/365._r8
           wt2(1) = 1._r8 - wt1(1)
@@ -839,7 +840,7 @@ contains
               call mpi_send(lnfmind, 2, MPI_INTEGER, 0, 200000+iam, mpicom, ier) 
               call mpi_recv(atm2lnd_vars%lnfm(g,:), 2920, MPI_REAL8, 0, 300000+iam, mpicom, status, ier)
             end if
-          end if
+         end if
 
           !Lightning data is 3-hourly.  Does not currently interpolate.
           atm2lnd_vars%forc_lnfm(g) = atm2lnd_vars%lnfm(g, ((int(thiscalday)-1)*8+tod/(3600*3))+1)
@@ -920,7 +921,7 @@ contains
   
           atm2lnd_vars%forc_ndep_grc(g)    = (atm2lnd_vars%ndep1(atm2lnd_vars%ndepind(g,1),atm2lnd_vars%ndepind(g,2),1)*wt1(1) + &
                                               atm2lnd_vars%ndep2(atm2lnd_vars%ndepind(g,1),atm2lnd_vars%ndepind(g,2),1)*wt2(1)) / (365._r8 * 86400._r8)
-        end if
+       end if model_filter
 
    !------------------------------------Aerosol forcing--------------------------------------------------
         if (atm2lnd_vars%loaded_bypassdata .eq. 0 .or. (mon .eq. 1 .and. day .eq. 1 .and. tod .eq. 0)) then 
@@ -961,7 +962,7 @@ contains
         end if
 
         !Use ndep grid indices since they're on the same grid
-        if (atm2lnd_vars%loaded_bypassdata .eq. 0 .and. .not. use_cn) then
+        if (atm2lnd_vars%loaded_bypassdata .eq. 0 .and. (.not. (use_cn .or. use_fates) )) then
             mindist=99999
             do thisx = 1,144
               do thisy = 1,96
