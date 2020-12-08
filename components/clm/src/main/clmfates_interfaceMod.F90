@@ -1331,11 +1331,14 @@ contains
                call this%fates_restart%get_restart_vectors(nc, this%fates(nc)%nsites, &
                     this%fates(nc)%sites )
 
-               
-
                ! I think ed_update_site and update_hlmfates_dyn are doing some similar
                ! update type stuff, should consolidate (rgk 11-2016)
                do s = 1,this%fates(nc)%nsites
+
+                  c = this%f2hmap(nc)%fcolumn(s)
+                  this%fates(nc)%bc_in(s)%max_rooting_depth_index_col = &
+                       min(this%fates(nc)%bc_in(s)%nlevsoil, canopystate_inst%altmax_lastyear_indx_col(c))
+                  
                   call ed_update_site( this%fates(nc)%sites(s), &
                         this%fates(nc)%bc_in(s), & 
                         this%fates(nc)%bc_out(s))
@@ -1509,6 +1512,11 @@ contains
                              this%fates(nc)%bc_in)
 
            do s = 1,this%fates(nc)%nsites
+
+              c = this%f2hmap(nc)%fcolumn(s)
+              this%fates(nc)%bc_in(s)%max_rooting_depth_index_col = &
+                   min(this%fates(nc)%bc_in(s)%nlevsoil, canopystate_inst%altmax_lastyear_indx_col(c))
+              
               call ed_update_site(this%fates(nc)%sites(s), &
                    this%fates(nc)%bc_in(s), & 
                    this%fates(nc)%bc_out(s))
