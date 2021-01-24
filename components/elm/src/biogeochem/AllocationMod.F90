@@ -41,7 +41,7 @@ module AllocationMod
   use WaterStateType      , only : waterstate_type
   use clm_varctl          , only : NFIX_PTASE_plant
   !use clm_instMod         , only : alm_fates
-  use CLMFatesInterfaceMod  , only : hlm_fates_interface_type
+  use ELMFatesInterfaceMod  , only : hlm_fates_interface_type
   
   !
   implicit none
@@ -287,17 +287,17 @@ contains
     end select
 
     select case(nu_com)
-        case('RD') ! relative demand mode, same as CLM-CNP Yang 2014
+        case('RD') ! relative demand mode, same as ELM-CNP Yang 2014
             nu_com_leaf_physiology = .false.
             nu_com_root_kinetics   = .false.
             nu_com_phosphatase     = .false.
             nu_com_nfix            = .false.
-        case('ECA') ! ECA competition version of CLM-CNP
+        case('ECA') ! ECA competition version of ELM-CNP
             nu_com_leaf_physiology = .true. ! leaf level physiology must be true if using ECA
             nu_com_root_kinetics   = .true. ! root uptake kinetics must be true if using ECA
             nu_com_phosphatase = .true.     ! new phosphatase activity
             nu_com_nfix = .true.            ! new fixation
-        case('MIC') ! MIC outcompete plant version of CLM-CNP
+        case('MIC') ! MIC outcompete plant version of ELM-CNP
             nu_com_leaf_physiology = .true.
             nu_com_root_kinetics   = .true.
             nu_com_phosphatase = .true.
@@ -1086,7 +1086,7 @@ contains
      ! ----------------------------------------------------------------------------------
      ! This routine evaluates the dynamic between competitors for nutrients, and resolves
      ! the fluxes between the different competitors and pools.  There are two schemes
-     ! presently, ECA and RD.
+     ! presently ECA and RD.
      !
      ! There are X steps to this process:
      !  1) Prepration of inputs, which come from different sources depending mostly
@@ -3352,12 +3352,7 @@ end subroutine Allocation2_ResolveNPLimit
             end do
          end do
       end if
-
-
-
-
       
-
       ! start new pft loop to distribute the available N between the
       ! competing patches on the basis of relative demand, and allocate C and N to
       ! new growth and storage
@@ -3494,7 +3489,7 @@ end subroutine Allocation2_ResolveNPLimit
                  plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p)) 
                  plant_palloc(p) = plant_calloc(p) * (p_allometry(p)/c_allometry(p))
                  if (veg_vp%nstor(veg_pp%itype(p)) < 1e-6_r8) then 
-                     sminp_to_ppool(p) = plant_palloc(p) - retransp_to_ppool(p)
+                     sminp_to_ppool(p) = max(plant_palloc(p) - retransp_to_ppool(p), 0.0_r8)
                  end if
              endif
   
