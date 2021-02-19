@@ -744,7 +744,7 @@ contains
        call mpi_bcast (pftspecific_rootingprofile,        1, MPI_LOGICAL,  0, mpicom, ier)
     end if
 
-    if ((use_cn .or. use_fates).and. use_nitrif_denitrif) then 
+    if ((use_cn .or. use_fates) .and. use_nitrif_denitrif) then 
        call mpi_bcast (no_frozen_nitrif_denitrif,  1, MPI_LOGICAL, 0, mpicom, ier)
     end if
 
@@ -978,7 +978,7 @@ contains
        write(iulog, *) '   dynamic roots                                         : ', use_dynroot
     end if
        
-    if (use_cn .and. .not. use_nitrif_denitrif) then
+    if (use_cn .or. use_fates) then
        write(iulog, *) '   no_frozen_nitrif_denitrif                             : ', no_frozen_nitrif_denitrif
     end if
 

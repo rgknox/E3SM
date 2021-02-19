@@ -21,7 +21,8 @@ module CNNitrifDenitrifMod
   use CNNitrogenStateType , only : nitrogenstate_type
   use ch4Mod              , only : ch4_type
   use ColumnType          , only : col_pp 
-  use ColumnDataType      , only : col_es, col_ws, col_cf, col_ns, col_nf  
+  use ColumnDataType      , only : col_es, col_ws, col_cf, col_ns, col_nf
+  use controlMod          , only : use_nitrif_denitrif
   !
   implicit none
   save
@@ -318,10 +319,14 @@ contains
             pot_f_nit_vr(c,j)  = pot_f_nit_vr(c,j) * (1._r8 - anaerobic_frac(c,j))
 
             ! limit to non-frozen soil layers
-            if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif) then
-               pot_f_nit_vr(c,j) = 0._r8
-            endif
 
+            if (.not.use_nitrif_denitrif) then
+               pot_f_nit_vr(c,j) = 0._r8
+            else               
+               if ( t_soisno(c,j) <= SHR_CONST_TKFRZ .and. no_frozen_nitrif_denitrif) then
+                  pot_f_nit_vr(c,j) = 0._r8
+               endif
+            end if
 
             !---------------- denitrification
             ! first some input variables an unit conversions
