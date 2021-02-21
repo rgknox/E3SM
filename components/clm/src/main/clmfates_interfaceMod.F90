@@ -121,7 +121,7 @@ module CLMFatesInterfaceMod
    use FatesInterfaceMod     , only : zero_bcs
    use FatesInterfaceMod     , only : FatesInterfaceInit
 
-   use FatesHistoryInterfaceMod, only : fates_history_interface_type
+   use FatesHistoryInterfaceMod, only : fates_hist
    use FatesRestartInterfaceMod, only : fates_restart_interface_type
 
    use PRTGenericMod         , only : num_elements
@@ -193,7 +193,7 @@ module CLMFatesInterfaceMod
       type(f2hmap_type), allocatable  :: f2hmap(:)
 
       ! fates_hist is the interface class for the history output
-      type(fates_history_interface_type) :: fates_hist
+      !type(fates_history_interface_type) :: fates_hist
 
       ! fates_restart is the inteface calss for restarting the model
       type(fates_restart_interface_type) :: fates_restart
@@ -606,6 +606,7 @@ contains
          do s = 1, this%fates(nc)%nsites
 
             c = this%f2hmap(nc)%fcolumn(s)
+            this%fates(nc)%sites(s)%h_gid = c
             
             if (use_vertsoilc) then
                ndecomp = col_pp%nlevbed(c)
@@ -624,6 +625,9 @@ contains
             this%fates(nc)%sites(s)%lat = grc_pp%latdeg(g)
             this%fates(nc)%sites(s)%lon = grc_pp%londeg(g)
 
+            !this%fates(nc)%sites(s)%clump_id = nc
+            !this%fates(nc)%sites(s)%h_gid = c
+            
          end do
 
 
@@ -795,7 +799,13 @@ contains
       ! structures into the cohort structures.
       call UnPackNutrientAquisitionBCs(this%fates(nc)%sites, this%fates(nc)%bc_in)
 
-
+      
+      ! ---------------------------------------------------------------------------------
+      ! Flush arrays to values defined by %flushval (see registry entry in
+      ! subroutine define_history_vars()
+      ! ---------------------------------------------------------------------------------
+      call fates_hist%flush_hvars(nc,upfreq_in=1)
+      
       ! ---------------------------------------------------------------------------------
       ! Part II: Call the FATES model now that input boundary conditions have been
       ! provided.
@@ -832,10 +842,11 @@ contains
       ! ---------------------------------------------------------------------------------
       ! Part IV: 
       ! Update history IO fields that depend on ecosystem dynamics
+      ! GOAL: DEPRECATE THIS ROUTINE (DECENTRALIZE)
       ! ---------------------------------------------------------------------------------
-      call this%fates_hist%update_history_dyn( nc,                    &
-                                              this%fates(nc)%nsites, &
-                                              this%fates(nc)%sites) 
+      call fates_hist%update_history_dyn( nc,                    &
+                                          this%fates(nc)%nsites, &
+                                          this%fates(nc)%sites) 
 
       if (masterproc) then
          write(iulog, *) 'clm: leaving ED model', bounds_clump%begg, &
@@ -1408,9 +1419,9 @@ contains
                ! ------------------------------------------------------------------------
                ! Update history IO fields that depend on ecosystem dynamics
                ! ------------------------------------------------------------------------
-               call this%fates_hist%update_history_dyn( nc, &
-                     this%fates(nc)%nsites,                 &
-                     this%fates(nc)%sites) 
+               call fates_hist%update_history_dyn( nc, &
+                    this%fates(nc)%nsites,                 &
+                    this%fates(nc)%sites) 
 
                
             end if
@@ -1539,7 +1550,7 @@ contains
            ! ------------------------------------------------------------------------
            ! Update history IO fields that depend on ecosystem dynamics
            ! ------------------------------------------------------------------------
-           call this%fates_hist%update_history_dyn( nc, &
+           call fates_hist%update_history_dyn( nc, &
                 this%fates(nc)%nsites,                 &
                 this%fates(nc)%sites) 
 
@@ -2149,11 +2160,11 @@ contains
       end do
       
       ! Update history variables that track these variables
-      call this%fates_hist%update_history_hifrq(nc, &
-                               this%fates(nc)%nsites,  &
-                               this%fates(nc)%sites,   &
-                               this%fates(nc)%bc_in,   &
-                               dtime)
+      call fates_hist%update_history_hifrq(nc, &
+                                           this%fates(nc)%nsites,  &
+                                           this%fates(nc)%sites,   &
+                                           this%fates(nc)%bc_in,   &
+                                           dtime)
 
       
     end associate
@@ -2259,7 +2270,7 @@ end subroutine wrap_update_hifrq_hist
    
    call hlm_bounds_to_fates_bounds(bounds_proc, fates_bounds)
 
-   call this%fates_hist%Init(nclumps, fates_bounds)
+   call fates_hist%Init(nclumps, fates_bounds)
 
    ! Define the bounds on the first dimension for each thread
    !$OMP PARALLEL DO PRIVATE (nc,bounds_clump,fates_clump)
@@ -2269,73 +2280,54 @@ end subroutine wrap_update_hifrq_hist
       
       ! thread bounds for patch
       call hlm_bounds_to_fates_bounds(bounds_clump, fates_clump)
-      call this%fates_hist%SetThreadBoundsEach(nc, fates_clump)
+      call fates_hist%SetThreadBoundsEach(nc, fates_clump)
    end do
    !$OMP END PARALLEL DO
 
    ! ------------------------------------------------------------------------------------
-   ! PART I.5: SET SOME INDEX MAPPINGS SPECIFICALLY FOR SITE<->COLUMN AND PATCH 
-   ! ------------------------------------------------------------------------------------
-   
-   !$OMP PARALLEL DO PRIVATE (nc,s,c)
-   do nc = 1,nclumps
-      
-      allocate(this%fates_hist%iovar_map(nc)%site_index(this%fates(nc)%nsites))
-      allocate(this%fates_hist%iovar_map(nc)%patch1_index(this%fates(nc)%nsites))
-      
-      do s=1,this%fates(nc)%nsites
-         c = this%f2hmap(nc)%fcolumn(s)
-         this%fates_hist%iovar_map(nc)%site_index(s)   = c
-         this%fates_hist%iovar_map(nc)%patch1_index(s) = col_pp%pfti(c)+1
-      end do
-      
-   end do
-   !$OMP END PARALLEL DO
-   
-   ! ------------------------------------------------------------------------------------
    ! PART II: USE THE JUST DEFINED DIMENSIONS TO ASSEMBLE THE VALID IO TYPES
    ! INTERF-TODO: THESE CAN ALL BE EMBEDDED INTO A SUBROUTINE IN HISTORYIOMOD
    ! ------------------------------------------------------------------------------------
-   call this%fates_hist%assemble_history_output_types()
+   call fates_hist%assemble_history_output_types()
    
    ! ------------------------------------------------------------------------------------
    ! PART III: DEFINE THE LIST OF OUTPUT VARIABLE OBJECTS, AND REGISTER THEM WITH THE
    ! HLM ACCORDING TO THEIR TYPES
    ! ------------------------------------------------------------------------------------
-   call this%fates_hist%initialize_history_vars()
-   nvar = this%fates_hist%num_history_vars()
+   call fates_hist%initialize_history_vars()
+   nvar = fates_hist%num_history_vars()
    
    do ivar = 1, nvar
       
-      associate( vname    => this%fates_hist%hvars(ivar)%vname, &
-                 vunits   => this%fates_hist%hvars(ivar)%units,   &
-                 vlong    => this%fates_hist%hvars(ivar)%long, &
-                 vdefault => this%fates_hist%hvars(ivar)%use_default, &
-                 vavgflag => this%fates_hist%hvars(ivar)%avgflag)
+      associate( vname    => fates_hist%hvars(ivar)%vname, &
+                 vunits   => fates_hist%hvars(ivar)%units,   &
+                 vlong    => fates_hist%hvars(ivar)%long, &
+                 vdefault => fates_hist%hvars(ivar)%use_default, &
+                 vavgflag => fates_hist%hvars(ivar)%avgflag)
 
-        dk_index = this%fates_hist%hvars(ivar)%dim_kinds_index
-        ioname = trim(this%fates_hist%dim_kinds(dk_index)%name)
+        dk_index = fates_hist%hvars(ivar)%dim_kinds_index
+        ioname = trim(fates_hist%dim_kinds(dk_index)%name)
         
         select case(trim(ioname))
         case(patch_r8)
            call hist_addfld1d(fname=trim(vname),units=trim(vunits),         &
                               avgflag=trim(vavgflag),long_name=trim(vlong), &
-                              ptr_patch=this%fates_hist%hvars(ivar)%r81d,    &
+                              ptr_patch=fates_hist%hvars(ivar)%r81d,    &
                               default=trim(vdefault))
            
         case(site_r8)
            call hist_addfld1d(fname=trim(vname),units=trim(vunits),         &
                               avgflag=trim(vavgflag),long_name=trim(vlong), &
-                              ptr_col=this%fates_hist%hvars(ivar)%r81d,      & 
+                              ptr_col=fates_hist%hvars(ivar)%r81d,      & 
                               default=trim(vdefault))
 
         case(patch_ground_r8,patch_size_pft_r8)
-           d_index = this%fates_hist%dim_kinds(dk_index)%dim2_index
-           dim2name = this%fates_hist%dim_bounds(d_index)%name
+           d_index = fates_hist%dim_kinds(dk_index)%dim2_index
+           dim2name = fates_hist%dim_bounds(d_index)%name
            call hist_addfld2d(fname=trim(vname),units=trim(vunits),         & ! <--- addfld2d
                               type2d=trim(dim2name),                        & ! <--- type2d
                               avgflag=trim(vavgflag),long_name=trim(vlong), &
-                              ptr_patch=this%fates_hist%hvars(ivar)%r82d,    & 
+                              ptr_patch=fates_hist%hvars(ivar)%r82d,    & 
                               default=trim(vdefault))
 
        case(site_ground_r8, site_size_pft_r8, site_size_r8, site_pft_r8, &
@@ -2344,12 +2336,12 @@ end subroutine wrap_update_hifrq_hist
              site_scagpft_r8, site_agepft_r8, site_elem_r8, site_elpft_r8, &
              site_elcwd_r8, site_elage_r8, site_coage_r8, site_coage_pft_r8)
 
-           d_index = this%fates_hist%dim_kinds(dk_index)%dim2_index
-           dim2name = this%fates_hist%dim_bounds(d_index)%name
+           d_index = fates_hist%dim_kinds(dk_index)%dim2_index
+           dim2name = fates_hist%dim_bounds(d_index)%name
            call hist_addfld2d(fname=trim(vname),units=trim(vunits),         &
                               type2d=trim(dim2name),                        &
                               avgflag=trim(vavgflag),long_name=trim(vlong), &
-                              ptr_col=this%fates_hist%hvars(ivar)%r82d,     & 
+                              ptr_col=fates_hist%hvars(ivar)%r82d,     & 
                               default=trim(vdefault))
 
         case default
@@ -2584,7 +2576,7 @@ end subroutine wrap_update_hifrq_hist
 
    ! Update History Buffers that need to be updated after hydraulics calls
 
-   call this%fates_hist%update_history_hydraulics(nc, &
+   call fates_hist%update_history_hydraulics(nc, &
          this%fates(nc)%nsites, &
          this%fates(nc)%sites, &
          this%fates(nc)%bc_in, & 

@@ -116,6 +116,13 @@ module AllocationMod
   real(r8)              :: e_km_p                         ! temp variable of sum(E/KM) for P competition
   real(r8)              :: e_km_n                         ! temp variable of sum(E/KM) for N competition CN mode                     
 
+
+  ! These two indices are used for readibility purposes. There are N and P flags
+  ! that are used to define if the competition systems are source limited.
+  
+  integer, parameter :: not_limiting = 0 
+  integer, parameter :: limiting     = 1
+
   !-----------------------------------------------------------------------
 
 contains
@@ -1598,17 +1605,17 @@ contains
 
                do j = 1, nlevdecomp
                   
-                  if (nlimit(c,j) == 1.and.plimit(c,j) == 0) then
+                  if (nlimit(c,j) == limiting .and.plimit(c,j) == not_limiting ) then
                      
                      actual_immob_p_vr(c,j) = potential_immob_p_vr(c,j) * fpi_vr(c,j)
                      sminp_to_plant_vr(c,j) = col_plant_pdemand_vr(c,j)
                      
-                  elseif (nlimit(c,j) == 0.and.plimit(c,j) == 1) then
+                  elseif (nlimit(c,j) == not_limiting .and.plimit(c,j) == limiting ) then
                      
                      actual_immob_vr(c,j)   = potential_immob_vr(c,j) *fpi_p_vr(c,j)
                      sminn_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j)
                      
-                  elseif (nlimit(c,j) == 1.and.plimit(c,j) == 1)then
+                  elseif (nlimit(c,j) == limiting .and.plimit(c,j) == limiting )then
                      
                      if( fpi_vr(c,j) <=fpi_p_vr(c,j) )then
                         
@@ -1693,8 +1700,9 @@ contains
                residual_plant_pdemand(c) = plant_pdemand_col(c) - sminp_to_plant(c)
 
                do j = 1, nlevdecomp
+
                   if (residual_plant_ndemand(c)  >  0._r8 ) then
-                     if (nlimit(c,j) .eq. 0) then
+                     if (nlimit(c,j) .eq. not_limiting) then
                         residual_sminn_vr(c,j) = max(sminn_vr(c,j) - (actual_immob_vr(c,j) + sminn_to_plant_vr(c,j) ) * dt, 0._r8)
                         residual_sminn(c) = residual_sminn(c) + residual_sminn_vr(c,j) * dzsoi_decomp(j)
                      else
@@ -1704,7 +1712,7 @@ contains
                   
                   ! add phosphorus - X.YANG
                   if (residual_plant_pdemand(c)  >  0._r8 ) then
-                     if (plimit(c,j) .eq. 0) then
+                     if (plimit(c,j) .eq. not_limiting) then
                         residual_sminp_vr(c,j) = max(solutionp_vr(c,j) - (actual_immob_p_vr(c,j) + sminp_to_plant_vr(c,j) ) &
                              * dt, 0._r8)
                         residual_sminp(c) = residual_sminp(c) + residual_sminp_vr(c,j) * dzsoi_decomp(j)
@@ -1716,12 +1724,12 @@ contains
                
                ! distribute residual N and P to plants
                do j = 1, nlevdecomp
-                  if ( residual_plant_ndemand(c)  >  0._r8 .and. residual_sminn(c)  >  0._r8 .and. nlimit(c,j) .eq. 0) then
+                  if ( residual_plant_ndemand(c)  >  0._r8 .and. residual_sminn(c)  >  0._r8 .and. nlimit(c,j) .eq. not_limiting) then
                      sminn_to_plant_vr(c,j) = sminn_to_plant_vr(c,j) + residual_sminn_vr(c,j) * &
                           min(( residual_plant_ndemand(c) *  dt ) / residual_sminn(c), 1._r8) / dt
                   endif
                   
-                  if ( residual_plant_pdemand(c)  >  0._r8 .and. residual_sminp(c)  >  0._r8 .and. plimit(c,j) .eq. 0) then
+                  if ( residual_plant_pdemand(c)  >  0._r8 .and. residual_sminp(c)  >  0._r8 .and. plimit(c,j) .eq. not_limiting) then
                      sminp_to_plant_vr(c,j) = sminp_to_plant_vr(c,j) + residual_sminp_vr(c,j) * &
                           min(( residual_plant_pdemand(c) *  dt ) / residual_sminp(c), 1._r8) / dt
                   endif
@@ -1807,7 +1815,10 @@ contains
                 end do
             end if
             
-         else  !----------NITRIF_DENITRIF-------------!
+
+         else
+
+         !================================== NITRIF_DENITRIF ========================================!
 
          if (nu_com .eq. 'RD') then
 
@@ -2218,22 +2229,24 @@ contains
 
             do f = 1,n_pcomp
                do j = 1,nlevdecomp
-
-                  ! Note that nuptake_prof and fpg are both unitless fractions
-                  ! units:  [g/m2] = [g/m3/s] * [/] * [/] * [s] [m]
                   
                   j_f =  elm_fates%fates(ci)%bc_pconst%j_uptake(j)
-
-                  elm_fates%fates(ci)%bc_in(s)%plant_n_uptake_flux(f,j_f) = & 
-                       elm_fates%fates(ci)%bc_in(s)%plant_n_uptake_flux(f,j_f) + & 
-                       elm_fates%fates(ci)%bc_out(s)%n_demand(f) * & 
-                       nuptake_prof(c,j)*fpg(c)*dt*dzsoi_decomp(j)
+                  
+                  elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) = & 
+                       elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) + &
+                       smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                       (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
+                  
+                  elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) = & 
+                       elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) + &
+                       smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                       (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
                   
                   elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) = & 
                        elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) + &
-                       elm_fates%fates(ci)%bc_out(s)%p_demand(f) * &
-                       puptake_prof(c,j)*fpg_p(c)*dt*dzsoi_decomp(j)
-
+                       sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                       (elm_fates%fates(ci)%bc_out(s)%p_demand(f)/plant_pdemand_col(c))
+                  
                end do
             end do
 
@@ -2242,10 +2255,14 @@ contains
             do f = 1,n_pcomp
                do j = 1,nlevdecomp
                   j_f =  elm_fates%fates(ci)%bc_pconst%j_uptake(j)
-                  elm_fates%fates(ci)%bc_in(s)%plant_n_uptake_flux(f,j_f) = & 
-                       elm_fates%fates(ci)%bc_in(s)%plant_n_uptake_flux(f,j_f) + & 
-                       (plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j) + & 
-                        plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j)) * dzsoi_decomp(j) * dt
+                  
+                  elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) = & 
+                       elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) + & 
+                       plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
+                  
+                  elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) = & 
+                       elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) + & 
+                       plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j) * dzsoi_decomp(j) * dt
                   
                   elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) = & 
                        elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) + & 
@@ -2330,7 +2347,7 @@ end subroutine Allocation2_ResolveNPLimit
    real(r8), intent(in)  :: vmax_nh4_plant(:)         ! vmax for plant uptake
    real(r8), intent(in)  :: km_decomp_nh4             ! km for microbial decomposer nh4 uptake
    real(r8), intent(in)  :: potential_immob_vr(:)     ! potential N immobilization [g/m3/s]
-   real(r8), intent(inout) :: plant_nh4demand_vr(:,:)   ! [g m-3 s-1] (m2 of col, not patch)
+   real(r8), intent(inout) :: plant_nh4demand_vr(:,:) ! [g m-3 s-1] (m2 of col, not patch)
    real(r8), intent(out) :: col_plant_nh4demand_vr(:) ! [g m-3 s-1] (m2 of col, not patch)
    integer, intent(out)  :: nlimit_nh4(:)             ! flag specifying if availabiity limits
    real(r8), intent(out) :: fpi_nh4_vr(:)             ! fraction of potential immobilization supplied by nh4 (no units)
@@ -2375,8 +2392,10 @@ end subroutine Allocation2_ResolveNPLimit
 
    ! 2.76 consider soil adsorption effect on [NH4+] availability, 
    ! based on Zhu et al., 2016 DOI: 10.1002/2016JG003554
-   real(r8), parameter :: adsorp_nh4_eff = 2.76_r8  
+   real(r8), parameter :: adsorp_nh4_eff = 2.76_r8
 
+   real(r8), parameter :: m3_per_liter = 1.e-3_r8   ! m3 per liter
+   
    ! scaling factor for plant fine root biomass to calculate nutrient carrier enzyme abundance
    real(r8), parameter :: e_plant_scalar  = 0.0000125_r8 
 
@@ -2391,7 +2410,7 @@ end subroutine Allocation2_ResolveNPLimit
       ! concentration to per soil water based 
 
       ! concentration of mineralized nutrient, per soil water
-      solution_conc = smin_nh4_vr(j) / (bd(j)*adsorp_nh4_eff + h2osoi_vol(j))
+      solution_conc = smin_nh4_vr(j) / (bd(j)*adsorp_nh4_eff*m3_per_liter + h2osoi_vol(j))
       
       e_km = 0._r8
       do i = 1, n_pcomp
@@ -2422,7 +2441,7 @@ end subroutine Allocation2_ResolveNPLimit
       do i = 1, n_pcomp
          ip = filter_pcomp(i)
          ft = ft_index(i)
-         
+
          ! This is the demand per m3 of the column (not patch) 
          ! (for native ELM divide through by the patch weight to get per m3 of patch)
          plant_nh4demand_vr(ip,j) = max(0._r8,vmax_nh4_plant(ft) * veg_rootc(i,j) * &
@@ -2430,9 +2449,14 @@ end subroutine Allocation2_ResolveNPLimit
 
          ! This is the total demand across all plant competitors
          col_plant_nh4demand_vr(j) = col_plant_nh4demand_vr(j) + plant_nh4demand_vr(ip,j)
+
+         if(cn_scalar(i)>1.1_r8) then
+            print*,'BAD C SCALAR>',cn_scalar(i)
+            stop
+         end if
          
       end do
-
+      
       sum_nh4_demand = col_plant_nh4demand_vr(j) + potential_immob_vr(j)
 
       if (present(smin_no3_vr)) sum_nh4_demand = sum_nh4_demand + pot_f_nit_vr(j)
@@ -2452,7 +2476,7 @@ end subroutine Allocation2_ResolveNPLimit
 
          ! NH4 availability is not limiting immobilization or plant
          ! uptake, and all can proceed at their potential rates
-         nlimit_nh4(j) = 0
+         nlimit_nh4(j) = not_limiting
          fpi_nh4_vr(j) = 1.0_r8
          actual_immob_nh4_vr(j) = potential_immob_vr(j)
          smin_nh4_to_plant_vr(j) = col_plant_nh4demand_vr(j)
@@ -2463,7 +2487,7 @@ end subroutine Allocation2_ResolveNPLimit
          ! NH4 availability can not satisfy the sum of immobilization, nitrification, and
          ! plant growth demands, so these three demands compete for available
          ! soil mineral NH4 resource.
-         nlimit_nh4(j) = 1
+         nlimit_nh4(j) = limiting
          if (sum_nh4_demand > 0.0_r8 .and. smin_nh4_vr(j) > 0.0_r8  &
               .and. sum_nh4_demand_scaled > 0.0_r8) then
             actual_immob_nh4_vr(j) = min((smin_nh4_vr(j)/dt)*(potential_immob_vr(j)* &
@@ -2551,7 +2575,7 @@ end subroutine Allocation2_ResolveNPLimit
          if (sum_no3_demand*dt < smin_no3_vr(j)) then
             ! NO3 availability is not limiting immobilization or plant
             ! uptake, and all can proceed at their potential rates
-            nlimit_no3(j) = 0
+            nlimit_no3(j) = not_limiting
             fpi_no3_vr(j) = 1.0_r8 -  fpi_nh4_vr(j)
             actual_immob_no3_vr(j) = (potential_immob_vr(j)-actual_immob_nh4_vr(j))
             smin_no3_to_plant_vr(j) = col_plant_no3demand_vr(j)
@@ -2562,7 +2586,7 @@ end subroutine Allocation2_ResolveNPLimit
             ! NO3 availability can not satisfy the sum of immobilization, denitrification, and
             ! plant growth demands, so these three demands compete for available
             ! soil mineral NO3 resource.
-            nlimit_no3(j) = 1
+            nlimit_no3(j) = limiting
             if (sum_no3_demand > 0.0_r8 .and. smin_no3_vr(j) > 0.0_r8 &
                  .and. sum_no3_demand_scaled > 0.0_r8) then
                actual_immob_no3_vr(j) = min((smin_no3_vr(j)/dt)*((potential_immob_vr(j)- &
@@ -2719,6 +2743,12 @@ end subroutine Allocation2_ResolveNPLimit
          plant_pdemand_vr_patch(ip,j) = max(0._r8,vmax_plant_p(ft) * veg_rootc(i,j) * & 
               cp_scalar(i) * t_scalar(j) * compet_plant(i))
          col_plant_pdemand_vr(j) = col_plant_pdemand_vr(j) + plant_pdemand_vr_patch(ip,j)
+
+         if(cp_scalar(i)>1.1_r8) then
+            print*,'BAD C SCALAR>',cp_scalar(i)
+            stop
+         end if
+         
       end do
 
 
@@ -2756,13 +2786,13 @@ end subroutine Allocation2_ResolveNPLimit
       if (sum_pdemand*dt < solutionp_vr(j)) then
          ! P availability is not limiting immobilization or plant
          ! uptake, and both can proceed at their potential rates
-         plimit(j) = 0
+         plimit(j) = not_limiting
          fpi_p_vr(j) = 1.0_r8
          actual_immob_p_vr(j) = potential_immob_p_vr(j)
          sminp_to_plant_vr(j) = col_plant_pdemand_vr(j)
          adsorb_to_labilep_vr(j) = adsorb_to_labilep_vr(j)
       elseif ( cnallocate_carbon_only() .or. cnallocate_carbonnitrogen_only() ) then !.or. &
-         plimit(j) = 1
+         plimit(j) = limiting
          fpi_p_vr(j) = 1.0_r8
          actual_immob_p_vr(j) = potential_immob_p_vr(j)
          sminp_to_plant_vr(j) =  col_plant_pdemand_vr(j)
@@ -2772,7 +2802,7 @@ end subroutine Allocation2_ResolveNPLimit
          ! P availability can not satisfy the sum of immobilization and
          ! plant growth demands, so these two demands compete for
          ! available soil mineral solution P resource.
-         plimit(j) = 1
+         plimit(j) = limiting
          if (sum_pdemand > 0.0_r8 .and. solutionp_vr(j) >0._r8 .and. sum_pdemand_scaled > 0.0) then
             if (nu_com .eq. 'ECA') sminp_to_plant_vr(j) = min(solutionp_vr(j)/dt * &
                  col_plant_pdemand_vr(j)/ sum_pdemand_scaled,col_plant_pdemand_vr(j))
@@ -2877,7 +2907,7 @@ end subroutine Allocation2_ResolveNPLimit
       if (sum_nh4_demand*dt < smin_nh4_vr(j)) then
          ! NH4 availability is not limiting immobilization or plant
          ! uptake, and all can proceed at their potential rates
-         nlimit_nh4(j) = 0
+         nlimit_nh4(j) = not_limiting
          fpi_nh4_vr(j) = 1.0_r8
          actual_immob_nh4_vr(j) = potential_immob_vr(j)
          smin_nh4_to_plant_vr(j) = col_plant_ndemand_vr(j)
@@ -2888,7 +2918,7 @@ end subroutine Allocation2_ResolveNPLimit
          ! NH4 availability can not satisfy the sum of immobilization, nitrification, and
          ! plant growth demands, so these three demands compete for available
          ! soil mineral NH4 resource.
-         nlimit_nh4(j) = 1
+         nlimit_nh4(j) = limiting
          if (sum_nh4_demand > 0.0_r8 .and. smin_nh4_vr(j) > 0.0_r8 &
               .and. sum_nh4_demand_scaled > 0.0_r8) then
             actual_immob_nh4_vr(j) = min((smin_nh4_vr(j)/dt)*(potential_immob_vr(j)* &
@@ -2931,7 +2961,7 @@ end subroutine Allocation2_ResolveNPLimit
             
             ! NO3 availability is not limiting immobilization or plant
             ! uptake, and all can proceed at their potential rates
-            nlimit_no3(j) = 1
+            nlimit_no3(j) = not_limiting   ! CHECK WITH XIAOJUAN ABOUT THIS (RGK 022021)
             fpi_no3_vr(j) = 1.0_r8 -  fpi_nh4_vr(j)
             actual_immob_no3_vr(j) = (potential_immob_vr(j)-actual_immob_nh4_vr(j))
             smin_no3_to_plant_vr(j) = (col_plant_ndemand_vr(j)-smin_nh4_to_plant_vr(j))
@@ -2942,7 +2972,7 @@ end subroutine Allocation2_ResolveNPLimit
             ! NO3 availability can not satisfy the sum of immobilization, denitrification, and
             ! plant growth demands, so these three demands compete for available
             ! soil mineral NO3 resource.
-            nlimit_no3(j) = 1
+            nlimit_no3(j) = limiting
             if (sum_no3_demand > 0.0_r8 .and. smin_no3_vr(j) > 0.0_r8 &
                  .and. sum_no3_demand_scaled > 0.0_r8) then
                actual_immob_no3_vr(j) = min((smin_no3_vr(j)/dt)*((potential_immob_vr(j)- &
@@ -3008,13 +3038,11 @@ end subroutine Allocation2_ResolveNPLimit
    ! ------------------------------------------------------------------------------------
    if ( cnallocate_carbon_only() .or. cnallocate_carbonnitrogen_only() ) then !.or. &
       do j = 1, nlevdecomp
-         sum_pdemand = col_plant_pdemand_vr(j) + potential_immob_p_vr(j)
-         plimit(j) = 1
+         plimit(j) = not_limiting  ! CHECK WITH XIAOJUAN ON THIS (RGK)
          fpi_p_vr(j) = 1.0_r8
          actual_immob_p_vr(j) = potential_immob_p_vr(j)
          sminp_to_plant_vr(j) =  col_plant_pdemand_vr(j)
-         ! This "supplement" variable is apparently zeroed somewhere else
-         supplement_to_sminp_vr(j) = sum_pdemand - (solutionp_vr(j)/dt)
+         supplement_to_sminp_vr(j) = col_plant_pdemand_vr(j) + potential_immob_p_vr(j) - (solutionp_vr(j)/dt)
       end do
       return
    end if
@@ -3027,7 +3055,7 @@ end subroutine Allocation2_ResolveNPLimit
          
          ! P availability is not limiting immobilization or plant
          ! uptake, and both can proceed at their potential rates
-         plimit(j) = 0
+         plimit(j) = not_limiting
          fpi_p_vr(j) = 1.0_r8
          actual_immob_p_vr(j) = potential_immob_p_vr(j)
          sminp_to_plant_vr(j) = col_plant_pdemand_vr(j)
@@ -3037,7 +3065,7 @@ end subroutine Allocation2_ResolveNPLimit
          ! plant growth demands, so these two demands compete for
          ! available soil mineral solution P resource.
          
-         plimit(j) = 1
+         plimit(j) = limiting
          if (sum_pdemand > 0.0_r8 .and. solutionp_vr(j) >0._r8) then
             actual_immob_p_vr(j) = (solutionp_vr(j)/dt)*(potential_immob_p_vr(j) / sum_pdemand)
          else

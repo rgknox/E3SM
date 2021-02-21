@@ -415,7 +415,7 @@ contains
           end if
 
           ! If parteh mode > 1, then NP are turned on, potentially
-          if(fates_parteh_mode > 1 ) then
+          if(fates_parteh_mode == 2 ) then
              if(use_fates_ed_prescribed_phys) then
                 call endrun(msg=' ERROR:: fates_parteh_mode > 1 not compatible with prescribed physiology'//&
                      errMsg(__FILE__, __LINE__))
@@ -424,6 +424,13 @@ contains
                 call endrun(msg=' ERROR:: fates_parteh_mode > 1 not compatible with FATES ST3 model'//&
                      errMsg(__FILE__, __LINE__))
              end if
+
+             
+             if( .not.use_nitrif_denitrif) then
+                call endrun(msg=' ERROR:: fates_parteh_mode = 2 should have nitrif/denitrif turned ON'//&
+                     errMsg(__FILE__, __LINE__))
+             end if
+             
           end if
 
           ! Deposition may work with FATES
