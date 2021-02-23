@@ -10,7 +10,7 @@ module CNNitrifDenitrifMod
   use elm_varpar          , only : nlevgrnd,nlevdecomp
   use elm_varcon          , only : rpi, denh2o, dzsoi, zisoi, grav
   use elm_varcon          , only : d_con_g, d_con_w, spval, secspday
-  use elm_varctl          , only : use_lch4, iulog
+  use elm_varctl          , only : use_lch4, iulog, use_nitrif_denitrif
   use abortutils          , only : endrun
   use decompMod           , only : bounds_type
   use SoilStatetype       , only : soilstate_type
@@ -22,7 +22,7 @@ module CNNitrifDenitrifMod
   use ch4Mod              , only : ch4_type
   use ColumnType          , only : col_pp 
   use ColumnDataType      , only : col_es, col_ws, col_cf, col_ns, col_nf
-  use controlMod          , only : use_nitrif_denitrif
+
   !
   implicit none
   save
