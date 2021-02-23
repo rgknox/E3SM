@@ -378,6 +378,13 @@ contains
           create_glacier_mec_landunit = .false.
        end if
 
+       ! Temporary - no non nitrif/denitrif is allowed
+       if (.not.use_nitrif_denitrif) then
+          call endrun(msg=' ERROR: must use N/DN now.'//&
+                   errMsg(__FILE__, __LINE__))
+       end if
+       
+       
        ! Check compatibility with the FATES model 
        if ( use_fates ) then
 
@@ -748,6 +755,9 @@ contains
        call mpi_bcast (no_frozen_nitrif_denitrif,  1, MPI_LOGICAL, 0, mpicom, ier)
     end if
 
+   
+
+    
     if (use_cn) then
        call mpi_bcast (use_c14_bombspike,  1, MPI_LOGICAL, 0, mpicom, ier)
        call mpi_bcast (atm_c14_filename,  len(atm_c14_filename), MPI_CHARACTER, 0, mpicom, ier)
