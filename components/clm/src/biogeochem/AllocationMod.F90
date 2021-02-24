@@ -2227,28 +2227,39 @@ contains
          
          if (nu_com .eq. 'RD') then
 
-            do f = 1,n_pcomp
-               do j = 1,nlevdecomp
-                  
-                  j_f =  elm_fates%fates(ci)%bc_pconst%j_uptake(j)
-                  
-                  elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) = & 
-                       elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) + &
-                       smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                       (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
-                  
-                  elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) = & 
-                       elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) + &
-                       smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                       (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
-                  
-                  elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) = & 
-                       elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) + &
-                       sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                       (elm_fates%fates(ci)%bc_out(s)%p_demand(f)/plant_pdemand_col(c))
-                  
+            if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
+               
+               do f = 1,n_pcomp
+                  do j = 1,nlevdecomp
+                     
+                     j_f =  elm_fates%fates(ci)%bc_pconst%j_uptake(j)
+                     
+                     elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) = & 
+                          elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,j_f) + &
+                          smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                          (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
+                     
+                     elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) = & 
+                          elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,j_f) + &
+                          smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                          (elm_fates%fates(ci)%bc_out(s)%n_demand(f)/plant_ndemand_col(c))
+
+                  end do
                end do
-            end do
+            end if
+            
+            if( plant_pdemand_col(c)>tiny(plant_pdemand_col(c)) ) then
+               do f = 1,n_pcomp
+                  do j = 1,nlevdecomp
+                     j_f =  elm_fates%fates(ci)%bc_pconst%j_uptake(j)
+                     elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) = & 
+                          elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,j_f) + &
+                          sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
+                          (elm_fates%fates(ci)%bc_out(s)%p_demand(f)/plant_pdemand_col(c))
+                     
+                  end do
+               end do
+            end if
 
          else ! ECA or MIC mode
 
@@ -2273,11 +2284,12 @@ contains
             
          end if
       end if
+      
    end do
    return
    
  end associate
-    
+ 
 end subroutine Allocation2_ResolveNPLimit
 
  ! ======================================================================================
