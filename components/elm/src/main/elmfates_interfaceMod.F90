@@ -724,6 +724,12 @@ contains
 
       !-----------------------------------------------------------------------
 
+
+      if (masterproc) then
+         write(iulog, *) 'FATES dynamics start'
+      end if
+
+      
       nc = bounds_clump%clump_index
 
       ! ---------------------------------------------------------------------------------
@@ -833,8 +839,7 @@ contains
                                               this%fates(nc)%sites) 
 
       if (masterproc) then
-         write(iulog, *) 'clm: leaving ED model', bounds_clump%begg, &
-                                                  bounds_clump%endg
+         write(iulog, *) 'FATES dynamics complete'
       end if
 
       
