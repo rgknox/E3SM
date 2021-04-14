@@ -110,7 +110,7 @@ module CLMFatesInterfaceMod
 
    ! Used FATES Modules
    use FatesConstantsMod     , only : ifalse
-   use FatesInterfaceTypesMod, only : fates_interface_type
+   use FatesInterfaceMod     , only : fates_interface_type
    use FatesInterfaceMod     , only : allocate_bcin
    use FatesInterfaceMod     , only : allocate_bcpconst
    use FatesInterfaceMod     , only : allocate_bcout
@@ -191,9 +191,6 @@ module CLMFatesInterfaceMod
       ! and its column number matching are its only members
 
       type(f2hmap_type), allocatable  :: f2hmap(:)
-
-      ! fates_hist is the interface class for the history output
-      !type(fates_history_interface_type) :: fates_hist
 
       ! fates_restart is the inteface calss for restarting the model
       type(fates_restart_interface_type) :: fates_restart
@@ -1337,7 +1334,8 @@ contains
                ! Convert newly read-in vectors into the FATES namelist state variables
                ! ------------------------------------------------------------------------
                call this%fates_restart%create_patchcohort_structure(nc, &
-                    this%fates(nc)%nsites, this%fates(nc)%sites, this%fates(nc)%bc_in)
+                    this%fates(nc)%nsites, this%fates(nc)%sites, &
+                    this%fates(nc)%bc_in, this%fates(nc)%bc_out)
                
                call this%fates_restart%get_restart_vectors(nc, this%fates(nc)%nsites, &
                     this%fates(nc)%sites )
@@ -1469,7 +1467,7 @@ contains
            call get_clump_bounds(nc, bounds_clump)
 
            do s = 1,this%fates(nc)%nsites
-              call init_site_vars(this%fates(nc)%sites(s),this%fates(nc)%bc_in(s) )
+              call init_site_vars(this%fates(nc)%sites(s),this%fates(nc)%bc_in(s),this%fates(nc)%bc_out(s) )
               call zero_site(this%fates(nc)%sites(s))
            end do
            
@@ -1525,8 +1523,13 @@ contains
            do s = 1,this%fates(nc)%nsites
 
               c = this%f2hmap(nc)%fcolumn(s)
-              this%fates(nc)%bc_in(s)%max_rooting_depth_index_col = &
-                   min(this%fates(nc)%bc_in(s)%nlevsoil, canopystate_inst%altmax_lastyear_indx_col(c))
+
+              ! ELM has not calculated the maximum rooting depths
+              ! it won't until the beginning of the
+              ! time-step loop. Therefore, we just initialize fluxes
+              ! into the litter pool in a trivial way prior to timestepping
+
+              this%fates(nc)%bc_in(s)%max_rooting_depth_index_col = 1
               
               call ed_update_site(this%fates(nc)%sites(s), &
                    this%fates(nc)%bc_in(s), & 
