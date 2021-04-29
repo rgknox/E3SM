@@ -261,6 +261,42 @@ contains
                ratio_diffusivity_water_gas(c,j) = (d_con_g(2,1) + d_con_g(2,2)*t_soisno(c,j) ) * 1.e-4_r8 / &
                     ((d_con_w(2,1) + d_con_w(2,2)*t_soisno(c,j) + d_con_w(2,3)*t_soisno(c,j)**2) * 1.e-9_r8)
 
+
+               ! diffus:
+               !  d_con_g() (AA?)
+               !  t_soisno  (AA?)
+               !  om_frac
+               !     organic_max (AA?)
+               !     cellorg()   (AA)
+               !  watfc()        (AA?)
+               !  watsat()       (AA)
+               !  bsw()          (AA)
+
+               ! To get anaerobic_frac:
+               ! ch4_vars%finundated_col
+               ! ch4_vars%o2_decomp_depth_unsat_col(c,j)
+               ! ch4_vars%o2_decomp_depth_sat
+               ! ch4_vars%conc_o2_unsat_col
+               ! ch4_vars%conc_o2_sat
+               !          
+               ! r_psi(c,j)
+               !   r_min
+               !      surface_tension_water (AA)
+               !      rho_w (AA)
+               !      grav (AA)
+               !      soilpsi (AA? check)
+               !   r_max
+               !      surface_tension_water (AA)
+               !      rho_w (AA)
+               !      grav  (AA)
+               !
+               ! rij_kro_a (AA)
+               ! rij_kro_alpha (AA)
+               ! h2osoi_vol (AA)
+               ! ratio_diffusivity_water_gas AA
+               ! sucsat (AA)
+               ! anoxia_wtsat
+               
                if (o2_decomp_depth_unsat(c,j) /= spval .and. conc_o2_unsat(c,j) /= spval .and.  & 
                     o2_decomp_depth_unsat(c,j) > 0._r8) then
                   anaerobic_frac(c,j) = exp(-rij_kro_a * r_psi(c,j)**(-rij_kro_alpha) * &

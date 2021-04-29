@@ -756,6 +756,11 @@ contains
 
          nlevsoil = this%fates(nc)%bc_in(s)%nlevsoil
 
+         ! Decomposition fluxes
+         this%fates(nc)%bc_in(s)%w_scalar_sisl(1:nlevsoil) = col_cf%w_scalar(c,1:nlevsoil)
+         this%fates(nc)%bc_in(s)%t_scalar_sisl(1:nlevsoil) = col_cf%t_scalar(c,1:nlevsoil)
+
+         
          this%fates(nc)%bc_in(s)%h2o_liqvol_sl(1:nlevsoil)  = &
                col_ws%h2osoi_vol(c,1:nlevsoil) 
 
@@ -1529,7 +1534,7 @@ contains
               ! time-step loop. Therefore, we just initialize fluxes
               ! into the litter pool in a trivial way prior to timestepping
 
-              this%fates(nc)%bc_in(s)%max_rooting_depth_index_col = 1
+              this%fates(nc)%bc_in(s)%max_rooting_depth_index_col =  this%fates(nc)%bc_in(s)%nlevdecomp
               
               call ed_update_site(this%fates(nc)%sites(s), &
                    this%fates(nc)%bc_in(s), & 
