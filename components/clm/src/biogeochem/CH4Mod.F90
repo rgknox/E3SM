@@ -1543,34 +1543,45 @@ contains
 
       if (nlevdecomp == 1) then
 
-         ! Set rootfraction to spval for non-veg points, unless veg_pp%wtcol > 0.99, 
-         ! in which case set it equal to uniform dist.
-         do j=1, nlevsoi
-            do fp = 1, num_soilp
-               p = filter_soilp(fp)
-               c = veg_pp%column(p)
 
-               if (veg_pp%itype(p) /= noveg) then
-                  rootfraction(p,j) = rootfr(p,j)
-               else if (veg_pp%wtcol(p) < 0.99_r8) then
-                  rootfraction(p,j) = spval
-               else
-                  rootfraction(p,j) = dz(c,j) / zi(c,nlevsoi)   ! Set equal to uniform distribution
-               end if
-            end do
-         end do
+         if(use_fates) then
 
-         call p2c (bounds, nlevgrnd, &
-              rootfraction(bounds%begp:bounds%endp, :), &
-              rootfr_col(bounds%begc:bounds%endc, :), &
-              'unity')
+            ! rootfr_col is already set in the interface
+            ! INTERF-TODO: pass in site/column level root fractions over soil depth
+            
+         else
          
-         do j=1, nlevsoi
-            do fc = 1, num_soilc
-               c = filter_soilc(fc)
-               if (.not. col_pp%active(c)) rootfr_col(c,j) = dz(c,j) / zi(c,nlevsoi)
+            ! Set rootfraction to spval for non-veg points, unless veg_pp%wtcol > 0.99, 
+            ! in which case set it equal to uniform dist.
+            do j=1, nlevsoi
+               do fp = 1, num_soilp
+                  p = filter_soilp(fp)
+                  c = veg_pp%column(p)
+
+                  if (veg_pp%itype(p) /= noveg) then
+                     rootfraction(p,j) = rootfr(p,j)
+                  else if (veg_pp%wtcol(p) < 0.99_r8) then
+                     rootfraction(p,j) = spval
+                  else
+                     rootfraction(p,j) = dz(c,j) / zi(c,nlevsoi)   ! Set equal to uniform distribution
+                  end if
+               end do
             end do
-         end do
+
+            call p2c (bounds, nlevgrnd, &
+                 rootfraction(bounds%begp:bounds%endp, :), &
+                 rootfr_col(bounds%begc:bounds%endc, :), &
+                 'unity')
+
+            do j=1, nlevsoi
+               do fc = 1, num_soilc
+                  c = filter_soilc(fc)
+                  if (.not. col_pp%active(c)) rootfr_col(c,j) = dz(c,j) / zi(c,nlevsoi)
+               end do
+            end do
+
+         end if
+         
       end if
 
       ! Determine grnd_ch4_cond_col
@@ -2027,22 +2038,37 @@ contains
 
       ! PATCH loop to calculate vertically resolved column-averaged root respiration
       if (.not. lake) then
-         rr_vr(bounds%begc:bounds%endc,:) = nan
 
-         do fp = 1, num_methc
-            c = filter_methc(fp)
-            rr_vr(c,:) = 0.0_r8
-         end do
-         do j=1,nlevsoi
-            do fp = 1, num_methp
-               p = filter_methp(fp)
-               c = veg_pp%column(p)
+         if(.not.use_fates)then
 
-               if (wtcol(p) > 0._r8 .and. veg_pp%itype(p) /= noveg) then
-                  rr_vr(c,j) = rr_vr(c,j) + rr(p)*rootfr(p,j)*wtcol(p)
-               end if
+            rr_vr(bounds%begc:bounds%endc,:) = nan
+            do fp = 1, num_methc
+               c = filter_methc(fp)
+               rr_vr(c,:) = 0.0_r8
             end do
-         end do
+            do j=1,nlevsoi
+               do fp = 1, num_methp
+                  p = filter_methp(fp)
+                  c = veg_pp%column(p)
+                  
+                  if (wtcol(p) > 0._r8 .and. veg_pp%itype(p) /= noveg) then
+                     rr_vr(c,j) = rr_vr(c,j) + rr(p)*rootfr(p,j)*wtcol(p)
+                  end if
+               end do
+            end do
+
+         else
+
+            ! INTERFACE-TODO
+            
+            do fp = 1, num_methc
+               c = filter_methc(fp)
+               s = 
+               rr_vr(c,:) = fates(nc)%bc_out(s)%root_resp_vr(:)
+            end do
+            
+         end if
+         
       end if
 
       partition_z = 1._r8
@@ -2526,6 +2552,18 @@ contains
       diffus_aere = d_con_g(1,1)*1.e-4_r8  ! for CH4: m^2/s
       ! This parameter is poorly constrained and should be done on a PFT-specific basis...
 
+
+      ! INTERFACE-TODO:
+
+      ! This whole routine loops over the filter_methp filter.
+      ! this is incompatible with fates
+      ! need: qflx_tran_veg(p)
+      !       annsum_npp(p)
+      !       annavg_agnpp(p)
+      !       annavg_bgnpp(p)
+      !       grass_fraction
+      !
+      
       ! point loop to partition aerenchyma flux into each soil layer
       if (.not. lake) then
          do j=1,nlevsoi
