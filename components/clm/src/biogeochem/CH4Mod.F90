@@ -2562,7 +2562,8 @@ contains
       !       annavg_agnpp(p)
       !       annavg_bgnpp(p)
       !       grass_fraction
-      !
+      !       frootc(p)
+      !       rootr(p,j)
       
       ! point loop to partition aerenchyma flux into each soil layer
       if (.not. lake) then
