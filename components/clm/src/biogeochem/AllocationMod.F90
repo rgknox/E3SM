@@ -1533,7 +1533,7 @@ contains
 
          else ! ECA mode or MIC outcompete plant mode
 
-            call NAllocationECAMIC(dzsoi_decomp(:),dt,                                                & ! IN
+            call NAllocationECAMIC(dt,                                                & ! IN
                                    bd(c,:),                                           & ! IN (j)
                                    h2osoi_vol(c,:),                                   & ! IN (j)
                                    t_scalar(c,:),                                     & ! IN (j)
@@ -1974,7 +1974,7 @@ end subroutine Allocation2_ResolveNPLimit
 
  ! ======================================================================================
  
- subroutine NAllocationECAMIC(dzsoi_decomp,dt,                     & ! IN
+ subroutine NAllocationECAMIC(dt,                     & ! IN
                               bd,                     & ! IN (j)
                               h2osoi_vol,             & ! IN (j)
                               t_scalar,               & ! IN (j)
@@ -2018,7 +2018,6 @@ end subroutine Allocation2_ResolveNPLimit
    use clm_varpar      , only: nlevdecomp
    
    ! Arguments (that are indifferent of NH4/NO3 species)
-   real(r8), intent(in)  :: dzsoi_decomp(:)
    real(r8), intent(in)  :: dt              ! Time step duration [s]
    real(r8), intent(in)  :: bd(:)           ! Bulk density of dry soil material [kg m-3]
    real(r8), intent(in)  :: h2osoi_vol(:)   ! Vol. Soil Water in each layer [m3]
@@ -2101,8 +2100,6 @@ end subroutine Allocation2_ResolveNPLimit
    plant_nh4demand(:) = 0._r8
    plant_no3demand(:) = 0._r8
 
-   !print*,"MINN NH4 NO3:",sum( smin_nh4_vr(:)),sum( smin_no3_vr(:))
-   
    do j = 1, nlevdecomp
 
       ! Plant, microbial decomposers compete for NH4. Thus loop over each 
@@ -2264,15 +2261,11 @@ end subroutine Allocation2_ResolveNPLimit
             plant_no3demand_vr(ip,j) = max(0._r8,vmax_no3_plant(ft) * veg_rootc(i,j) * &
                  cn_scalar(i) * t_scalar(j) *  compet_plant(i))
 
-         !   print*,plant_no3demand_vr(ip,j),vmax_no3_plant(ft),veg_rootc(i,j), cn_scalar(i),t_scalar(j),compet_plant(i)
-            
             ! This is the total demand across all plant competitors  (weighted in native, because
             ! demand is per m2 of patch
             col_plant_no3demand_vr(j) = col_plant_no3demand_vr(j) + plant_no3demand_vr(ip,j)
             
          end do
-
-         !print*,"END NO3"
          
          ! next compete for no3
          sum_no3_demand = col_plant_no3demand_vr(j) + &
