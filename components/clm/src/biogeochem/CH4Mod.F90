@@ -1316,6 +1316,7 @@ contains
     integer  :: sat                                    ! 0 = unsatured, 1 = saturated
     logical  :: lake                                   ! lake or not lake
     integer  :: j,fc,c,g,fp,p,t,pf,s                   ! indices
+    real(r8) :: annavg_ag,annavg_bg
     real(r8) :: dtime                                  ! land model time step (sec)
     real(r8) :: dtime_ch4                              ! ch4 model time step (sec)
     integer  :: nstep
@@ -1326,6 +1327,7 @@ contains
     real(r8) :: totalsat
     real(r8) :: totalunsat
     real(r8) :: dfsat
+    real(r8) :: rr_vr(bounds%begc:bounds%endc, 1:nlevsoi) ! vertically resolved column-mean root respiration (g C/m^2/s)
     real(r8) :: rootfraction(bounds%begp:bounds%endp, 1:nlevgrnd) 
     real(r8) :: totcolch4_bef(bounds%begc:bounds%endc) ! g C / m^2
     real(r8) :: errch4                                 ! g C / m^2
@@ -1341,6 +1343,9 @@ contains
     real(r8) :: highlatfact                            ! multiple of qflxlagd for high latitudes
     integer  :: dummyfilter(1)                         ! empty filter
     character(len=32) :: subname='ch4'                 ! subroutine name
+
+    logical, parameter :: debug_bcs = .true.
+    
     !-----------------------------------------------------------------------
 
     associate(                                                                 & 
@@ -1429,6 +1434,10 @@ contains
       jwt(begc:endc)            = huge(1)
       totcolch4_bef(begc:endc)  = nan
 
+      if(debug_bcs) then
+         open(unit=63,file='ch4stats.txt',Access='append',Status='unknown')
+      end if
+      
       ! Initialize local fluxes to zero: necessary for columns outside the filters because averaging up to gridcell will be done
       ch4_surf_flux_tot(begc:endc) = 0._r8
       ch4_prod_tot(begc:endc)      = 0._r8
@@ -1612,29 +1621,73 @@ contains
 
       if(debug_bcs) then
 
-         print*,'-------------------'
+         nc = bounds%clump_index
+         rr_vr(bounds%begc:bounds%endc,:) = nan
+         do fp = 1,  num_soilc
+            c = filter_soilc(fp)
+            rr_vr(c,:) = 0.0_r8
+         end do
+         
          do fp = 1, num_soilp
             p = filter_soilp(fp)
             c = veg_pp%column(p)
+            if(.not.col_pp%is_fates(c)) then
+               if (veg_pp%wtcol(p) > 0._r8 .and. veg_pp%itype(p) /= noveg) then
+                  do j=1,nlevsoi
+                     rr_vr(c,j) = rr_vr(c,j) + veg_cf%rr(p)*rootfr(p,j)*veg_pp%wtcol(p)
+                  enddo
+               end if
+            end if
+         end do
 
-            
-
+         
+         !print*,'-------------------'
+         do fp = 1, num_soilp
+            p = filter_soilp(fp)
+            c = veg_pp%column(p)
             
             if(.not. col_pp%is_fates(c) ) then
 
+               if(veg_cf%annavg_agnpp(p)>1.e30_r8)then
+                  annavg_ag = 0._r8
+               else
+                  annavg_ag = veg_cf%annavg_agnpp(p)
+               end if
+               if(veg_cf%annavg_bgnpp(p)>1.e30_r8)then
+                  annavg_bg = 0._r8
+               else
+                  annavg_bg = veg_cf%annavg_bgnpp(p)
+               end if
 
+               if(canopystate_vars%elai_patch(p)>0.1_r8)then
+               write(63,'(I2,2x,10F16.8)'),p,veg_pp%wtcol(p), & 
+                    sum(soilstate_vars%rootr_patch(p,1:nlevsoi)), &
+                    canopystate_vars%elai_patch(p), &
+                    veg_wf%qflx_tran_veg(p), &
+                    annavg_ag, &
+                    annavg_bg, &
+                    veg_cf%annsum_npp(p), &
+                    veg_cs%frootc(p), &
+                    sum(rr_vr(c,1:nlevsoi)), &
+                    sum(rootfr(p,1:nlevsoi))
+               end if
             else
                pf = p-col_pp%pfti(c)
-               s = elm_fates%f2hmap(nc)%hsites(c)
-
-               print*,sum(rootr(p,:)),elai(p), & 
-                    bc_out%annavg_agnpp_pa(pf), & 
-                    bc_out%annavg_bgnpp_pa(pf), & 
-                    bc_out%annsum_npp_pa(pf), & 
-                    bc_out%frootc_pa(pf), & 
-                    sum(bc_out%root_resp(:)), & 
-                    sum(bc_out%rootfr_pa(pf,:))
                
+               s = elm_fates%f2hmap(nc)%hsites(c)
+!              
+               if(canopystate_vars%elai_patch(p)>0.1_r8)then
+               write(63,'(I2,2x,10F16.8)'),p,veg_pp%wtcol(p), &
+                    sum(soilstate_vars%rootr_patch(p,1:nlevsoi)), &
+                    canopystate_vars%elai_patch(p), &
+                    veg_wf%qflx_tran_veg(p), & 
+                    elm_fates%fates(nc)%bc_out(s)%annavg_agnpp_pa(pf), & 
+                    elm_fates%fates(nc)%bc_out(s)%annavg_bgnpp_pa(pf), & 
+                    elm_fates%fates(nc)%bc_out(s)%annsum_npp_pa(pf), & 
+                    elm_fates%fates(nc)%bc_out(s)%frootc_pa(pf), & 
+                    sum(elm_fates%fates(nc)%bc_out(s)%root_resp(1:nlevsoi)), & 
+                    sum(elm_fates%fates(nc)%bc_out(s)%rootfr_pa(pf,1:nlevsoi))
+            end if
             end if
 
             
@@ -1644,6 +1697,7 @@ contains
          
       end if
 
+     
       
       !-------------------------------------------------
       ! Loop over saturated and unsaturated, non-lakes
@@ -1932,6 +1986,9 @@ contains
            nem_col(begc:endc), nem_grc(begg:endg),               &
            c2l_scale_type= 'unity', l2g_scale_type='unity' )
 
+
+      close(unit=63)
+      
     end associate
 
   end subroutine CH4
