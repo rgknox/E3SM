@@ -1344,7 +1344,7 @@ contains
     integer  :: dummyfilter(1)                         ! empty filter
     character(len=32) :: subname='ch4'                 ! subroutine name
 
-    logical, parameter :: debug_bcs = .true.
+    logical, parameter :: debug_bcs = .false.
     
     !-----------------------------------------------------------------------
 
