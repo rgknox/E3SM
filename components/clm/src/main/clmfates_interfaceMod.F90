@@ -537,9 +537,10 @@ contains
 
          ! Initialize all columns with a zero index, which indicates no FATES site
          this%f2hmap(nc)%hsites(:) = 0
-
+         
          s = 0
          do c = bounds_clump%begc,bounds_clump%endc
+
             l = col_pp%landunit(c)
                
             ! These are the key constraints that determine if this column
@@ -552,6 +553,8 @@ contains
                collist(s) = c
                this%f2hmap(nc)%hsites(c) = s
 
+               col_pp%is_fates(c) = .true.
+               
                if(debug)then
                   write(iulog,*) 'alm_fates%init(): thread',nc,': found column',c,'with lu',l
                   write(iulog,*) 'LU type:', lun_pp%itype(l)
@@ -1107,7 +1110,6 @@ contains
              displa(p) = this%fates(nc)%bc_out(s)%displa_pa(ifp)
              dleaf_patch(p) = this%fates(nc)%bc_out(s)%dleaf_pa(ifp)
              
-
           end do
 
        end do
@@ -1748,8 +1750,8 @@ contains
          btran       => energyflux_inst%btran_patch         , & ! Output: [real(r8) (:)   ]  transpiration wetness factor (0 to 1) 
          btran2       => energyflux_inst%btran2_patch       , & ! Output: [real(r8) (:)   ]  
          rresis      => energyflux_inst%rresis_patch        , & ! Output: [real(r8) (:,:) ]  root resistance by layer (0-1)  (nlevgrnd) 
-         rootr       => soilstate_inst%rootr_patch          & ! Output: [real(r8) (:,:) ]  Fraction of water uptake in each layer
-         )
+         rootr       => soilstate_inst%rootr_patch           )  ! Output: [real(r8) (:,:) ]  Effective fraction of water uptake in each layer
+
 
 
         nc = bounds_clump%clump_index
@@ -1874,6 +1876,7 @@ contains
                  
               end do
            end do
+           
         end do
       end associate
 

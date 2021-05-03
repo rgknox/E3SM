@@ -1150,7 +1150,7 @@ contains
                filter(nc)%num_soilp, filter(nc)%soilp,                                             &
                atm2lnd_vars, lakestate_vars, canopystate_vars, soilstate_vars, soilhydrology_vars, &
                temperature_vars, energyflux_vars, waterstate_vars, waterflux_vars,                 &
-               carbonstate_vars, carbonflux_vars, nitrogenflux_vars, ch4_vars, lnd2atm_vars)
+               carbonstate_vars, carbonflux_vars, nitrogenflux_vars, ch4_vars, lnd2atm_vars, alm_fates )
           call t_stopf('ch4')
        end if
        
