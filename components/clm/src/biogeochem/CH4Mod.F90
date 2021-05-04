@@ -1327,7 +1327,6 @@ contains
     real(r8) :: totalsat
     real(r8) :: totalunsat
     real(r8) :: dfsat
-    real(r8) :: rr_vr(bounds%begc:bounds%endc, 1:nlevsoi) ! vertically resolved column-mean root respiration (g C/m^2/s)
     real(r8) :: rootfraction(bounds%begp:bounds%endp, 1:nlevgrnd) 
     real(r8) :: totcolch4_bef(bounds%begc:bounds%endc) ! g C / m^2
     real(r8) :: errch4                                 ! g C / m^2
