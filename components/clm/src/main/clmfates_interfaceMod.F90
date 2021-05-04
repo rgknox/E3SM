@@ -56,6 +56,7 @@ module CLMFatesInterfaceMod
    use clm_varctl        , only : use_fates_fixed_biogeog
    use clm_varctl        , only : fates_inventory_ctrl_filename
    use clm_varctl        , only : use_nitrif_denitrif
+   use clm_varctl        , only : use_lch4
    use clm_varcon        , only : tfrz
    use clm_varcon        , only : spval 
    use clm_varcon        , only : denice
@@ -255,6 +256,7 @@ contains
      logical                                        :: verbose_output
      integer                                        :: pass_masterproc
      integer                                        :: pass_vertsoilc
+     integer                                        :: pass_ch4
      integer                                        :: pass_ed_st3
      integer                                        :: pass_logging
      integer                                        :: pass_ed_prescribed_phys
@@ -338,6 +340,13 @@ contains
         end if
         call set_fates_ctrlparms('is_restart',ival=pass_is_restart)
 
+        if(use_lch4) then
+           pass_ch4 = 1
+        else
+           pass_ch4 = 0
+        end if
+        call set_fates_ctrlparms('use_ch4',ival=pass_ch4)
+        
         if(use_vertsoilc) then
            pass_vertsoilc = 1
         else

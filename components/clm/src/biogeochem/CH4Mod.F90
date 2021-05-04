@@ -1344,8 +1344,6 @@ contains
     integer  :: dummyfilter(1)                         ! empty filter
     character(len=32) :: subname='ch4'                 ! subroutine name
 
-    logical, parameter :: debug_bcs = .false.
-    
     !-----------------------------------------------------------------------
 
     associate(                                                                 & 
@@ -1434,10 +1432,6 @@ contains
       jwt(begc:endc)            = huge(1)
       totcolch4_bef(begc:endc)  = nan
 
-      if(debug_bcs) then
-         open(unit=63,file='ch4stats.txt',Access='append',Status='unknown')
-      end if
-      
       ! Initialize local fluxes to zero: necessary for columns outside the filters because averaging up to gridcell will be done
       ch4_surf_flux_tot(begc:endc) = 0._r8
       ch4_prod_tot(begc:endc)      = 0._r8
@@ -1619,86 +1613,6 @@ contains
         !c_atm(g,3) =  forc_pco2(t) / rgasm / forc_t(t) ! [mol/m3 air] - Not currently used
       enddo
 
-      if(debug_bcs) then
-
-         nc = bounds%clump_index
-         rr_vr(bounds%begc:bounds%endc,:) = nan
-         do fp = 1,  num_soilc
-            c = filter_soilc(fp)
-            rr_vr(c,:) = 0.0_r8
-         end do
-         
-         do fp = 1, num_soilp
-            p = filter_soilp(fp)
-            c = veg_pp%column(p)
-            if(.not.col_pp%is_fates(c)) then
-               if (veg_pp%wtcol(p) > 0._r8 .and. veg_pp%itype(p) /= noveg) then
-                  do j=1,nlevsoi
-                     rr_vr(c,j) = rr_vr(c,j) + veg_cf%rr(p)*rootfr(p,j)*veg_pp%wtcol(p)
-                  enddo
-               end if
-            end if
-         end do
-
-         
-         !print*,'-------------------'
-         do fp = 1, num_soilp
-            p = filter_soilp(fp)
-            c = veg_pp%column(p)
-            
-            if(.not. col_pp%is_fates(c) ) then
-
-               if(veg_cf%annavg_agnpp(p)>1.e30_r8)then
-                  annavg_ag = 0._r8
-               else
-                  annavg_ag = veg_cf%annavg_agnpp(p)
-               end if
-               if(veg_cf%annavg_bgnpp(p)>1.e30_r8)then
-                  annavg_bg = 0._r8
-               else
-                  annavg_bg = veg_cf%annavg_bgnpp(p)
-               end if
-
-               if(canopystate_vars%elai_patch(p)>0.1_r8)then
-               write(63,'(I2,2x,10F16.8)'),p,veg_pp%wtcol(p), & 
-                    sum(soilstate_vars%rootr_patch(p,1:nlevsoi)), &
-                    canopystate_vars%elai_patch(p), &
-                    veg_wf%qflx_tran_veg(p), &
-                    annavg_ag, &
-                    annavg_bg, &
-                    veg_cf%annsum_npp(p), &
-                    veg_cs%frootc(p), &
-                    sum(rr_vr(c,1:nlevsoi)), &
-                    sum(rootfr(p,1:nlevsoi))
-               end if
-            else
-               pf = p-col_pp%pfti(c)
-               
-               s = elm_fates%f2hmap(nc)%hsites(c)
-!              
-               if(canopystate_vars%elai_patch(p)>0.1_r8)then
-               write(63,'(I2,2x,10F16.8)'),p,veg_pp%wtcol(p), &
-                    sum(soilstate_vars%rootr_patch(p,1:nlevsoi)), &
-                    canopystate_vars%elai_patch(p), &
-                    veg_wf%qflx_tran_veg(p), & 
-                    elm_fates%fates(nc)%bc_out(s)%annavg_agnpp_pa(pf), & 
-                    elm_fates%fates(nc)%bc_out(s)%annavg_bgnpp_pa(pf), & 
-                    elm_fates%fates(nc)%bc_out(s)%annsum_npp_pa(pf), & 
-                    elm_fates%fates(nc)%bc_out(s)%frootc_pa(pf), & 
-                    sum(elm_fates%fates(nc)%bc_out(s)%root_resp(1:nlevsoi)), & 
-                    sum(elm_fates%fates(nc)%bc_out(s)%rootfr_pa(pf,1:nlevsoi))
-            end if
-            end if
-
-            
-         end do
-
-         
-         
-      end if
-
-     
-      
       !-------------------------------------------------
       ! Loop over saturated and unsaturated, non-lakes
       !------------------------------------------------
@@ -1986,9 +1900,6 @@ contains
            nem_col(begc:endc), nem_grc(begg:endg),               &
            c2l_scale_type= 'unity', l2g_scale_type='unity' )
 
-
-      close(unit=63)
-      
     end associate
 
   end subroutine CH4
@@ -2563,6 +2474,7 @@ contains
     real(r8) :: nongrassporosratio     ! Ratio of root porosity in non-grass to grass, used for aerenchyma transport
     real(r8) :: unsat_aere_ratio       ! Ratio to multiply upland vegetation aerenchyma porosity by compared to inundated systems (= 0.05_r8 / 0.3_r8)
     real(r8) :: porosmin               ! minimum aerenchyma porosity (unitless)(= 0.05_r8)
+    real(r8) :: wfrac                  ! fraction (by crown area) of plants that are woody
     real(r8) :: poros_tiller 
 
     ! These pointers help us swap between big-leaf and fates boundary conditions
@@ -2674,7 +2586,9 @@ contains
                   
                   pf = p-col_pp%pfti(c)
                   s  = elm_fates%f2hmap(nc)%hsites(c)
-                  poros_tiller = 0.5_r8*0.3_r8 + 0.5_r8*0.3_r8*CH4ParamsInst%nongrassporosratio
+
+                  wfrac = elm_fates%fates(nc)%bc_out(s)%woody_frac_aere_pa(pf)
+                  poros_tiller = wfrac*0.3_r8 + (1._r8-wfrac)*0.3_r8*CH4ParamsInst%nongrassporosratio
                   is_vegetated = .true.
 
                   annsum_npp_ptr   => elm_fates%fates(nc)%bc_out(s)%annsum_npp_pa(pf)
