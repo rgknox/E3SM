@@ -1278,7 +1278,7 @@ contains
            ! Estimate actual allocation rates via Capacitance Aquisition
            ! approach (ECA/CA)
 
-            call NAllocationECAMIC(dzsoi_decomp(:),dt,                       & ! IN
+            call NAllocationECAMIC(dt,                                       & ! IN
                                    bd(c,:),                                  & ! IN (j)
                                    h2osoi_vol(c,:),                          & ! IN (j)
                                    t_scalar(c,:),                            & ! IN (j)
@@ -2864,7 +2864,7 @@ contains
   
   ! ======================================================================================
 
-  subroutine NAllocationECAMIC(dzsoi_decomp,dt,                     & ! IN
+  subroutine NAllocationECAMIC(dt,                     & ! IN
        bd,                     & ! IN (j)
        h2osoi_vol,             & ! IN (j)
        t_scalar,               & ! IN (j)
@@ -2907,7 +2907,6 @@ contains
     ! ------------------------------------------------------------------------------------
     use elm_varpar      , only: nlevdecomp
 
-    real(r8), intent(in)  :: dzsoi_decomp(:)
     real(r8), intent(in)  :: dt              ! Time step duration [s]
     real(r8), intent(in)  :: bd(:)           ! Bulk density of dry soil material [kg m-3]
     real(r8), intent(in)  :: h2osoi_vol(:)   ! Vol. Soil Water in each layer [m3]
