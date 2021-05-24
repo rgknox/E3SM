@@ -1191,13 +1191,14 @@ contains
                   ! calculate competition coefficients for NH4/NO3
                   ! first need to convert concentration to per soil water based
                   ! 2.76 consider soil adsorption effect on [NH4+] availability, based on Zhu et al., 2016 DOI: 10.1002/2016JG003554
-                  solution_nh4conc(c,j) = smin_nh4_vr(c,j) / (bd(c,j)*2.76 + h2osoi_vol(c,j)) ! convert to per soil water based
+                  solution_nh4conc(c,j) = smin_nh4_vr(c,j) / (bd(c,j)*2.76*1.e-3_r8 + h2osoi_vol(c,j)) ! convert to per soil water based
                   solution_no3conc(c,j) = smin_no3_vr(c,j) /  h2osoi_vol(c,j) ! convert to per soil water based
                   e_km_nh4 = 0._r8
                   e_km_no3 = 0._r8
                   decompmicc(c,j) = 0.0_r8
                   do p = col_pp%pfti(c), col_pp%pftf(c)
                      if (veg_pp%active(p).and. (veg_pp%itype(p) .ne. noveg)) then
+                        decompmicc(c,j) = decompmicc(c,j) + decompmicc_patch_vr(ivt(p),j)*veg_pp%wtcol(p)
                         e_km_nh4 = e_km_nh4 + e_plant_scalar*frootc(p)*froot_prof(p,j)*veg_pp%wtcol(p)/km_plant_nh4(ivt(p))
                         e_km_no3 = e_km_no3 + e_plant_scalar*frootc(p)*froot_prof(p,j)*veg_pp%wtcol(p)/km_plant_no3(ivt(p))
                      end if
@@ -1393,12 +1394,19 @@ contains
 
                      if ( smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j) < col_plant_ndemand_vr(c,j)) then
                         nlimit(c,j) = 1
-                        supplement_to_sminn_vr(c,j) = supplement_to_sminn_vr(c,j) + &
-                             (col_plant_nh4demand_vr(c,j) + col_plant_no3demand_vr(c,j) - smin_no3_to_plant_vr(c,j)) &
-                             - smin_nh4_to_plant_vr(c,j)
+
+!                        supplement_to_sminn_vr(c,j) = supplement_to_sminn_vr(c,j) + &
+!                             (col_plant_nh4demand_vr(c,j) + col_plant_no3demand_vr(c,j) - smin_no3_to_plant_vr(c,j)) &
+!                             - smin_nh4_to_plant_vr(c,j)
                         ! update to new values that satisfy demand
-                        smin_nh4_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j) - col_plant_no3demand_vr(c,j)
-                        sminn_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j)
+!                        smin_nh4_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j) - col_plant_no3demand_vr(c,j)
+!                        sminn_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j)
+
+                        supplement_to_sminn_vr(c,j) = supplement_to_sminn_vr(c,j) + &
+                             col_plant_ndemand_vr(c,j) - (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j))
+                        ! update to new values that satisfy demand
+                        smin_nh4_to_plant_vr(c,j) = col_plant_ndemand_vr(c,j) - smin_no3_to_plant_vr(c,j)
+                        
                      end if
                   end if
 
