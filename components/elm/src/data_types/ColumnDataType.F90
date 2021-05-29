@@ -5642,6 +5642,7 @@ contains
     else
        vr_suffix = ""
     endif
+
     ! ------------------------------------------------------------------------------------
     ! History Diagnostics with FATES turned on is a very limited set, and only
     ! operates on C12 right now.
