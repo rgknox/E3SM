@@ -939,8 +939,6 @@ contains
    real(r8), pointer :: plant_pdemand_vr_ptr(:,:)
    real(r8), pointer :: km_p_ptr(:), km_nh4_ptr(:), km_no3_ptr(:)
    real(r8), pointer :: vmax_p_ptr(:), vmax_nh4_ptr(:), vmax_no3_ptr(:)
-   logical :: supp_n   ! Are we supplementing N?
-   logical :: supp_p   ! Are we supplementing P?
    real(r8):: cn_stoich_var=0.2    ! variability of CN ratio
    real(r8):: cp_stoich_var=0.4    ! variability of CP ratio
    
@@ -1053,23 +1051,6 @@ contains
         )
 
 
-     ! Perform some logic to help clarify when we are supplementing the system
-     ! with P and/or N. Note, these supplemental fluxes are applied directly
-     ! to the competitors to meet demand, it is not added directly
-     ! to the mineralized pool
-     
-     if ( carbon_only .or.  carbonphosphorus_only ) then
-        supp_n = .true.
-     else
-        supp_n = .false.
-     end if
-
-     if ( carbon_only .or. carbonnitrogen_only ) then
-        supp_p = .true.
-     else
-        supp_p = .false.
-     end if
-     
      if (nu_com .eq. 'RD') then ! 'RD' : relative demand approach
 
         ! Starting resolving N/P limitation
@@ -1190,7 +1171,7 @@ contains
               plant_no3demand_vr_patch(col_pp%pfti(c):col_pp%pftf(c),:) = 0._r8
               plant_nh4demand_vr_patch(col_pp%pfti(c):col_pp%pftf(c),:) = 0._r8
 
-              if ( .not. supp_n ) then
+              if (.not.(carbonphosphorus_only .or. carbon_only))then
                  do f = 1,n_pcomp
                     p = filter_pcomp(f)
                     cn_scalar(p) = min(max(((leafc(p) + leafc_storage(p) + leafc_xfer(p))/ &
@@ -1211,7 +1192,7 @@ contains
               cp_scalar(col_pp%pfti(c):col_pp%pftf(c)) = 0._r8
               plant_pdemand_vr_patch(col_pp%pfti(c):col_pp%pftf(c),:) = 0._r8
 
-              if ( .not. supp_p ) then
+              if ( .not. (carbonnitrogen_only .or. carbon_only) ) then
                  do f = 1,n_pcomp
                     p = filter_pcomp(f)
                     cp_scalar(p) = min(max(((leafc(p) + leafc_storage(p) + leafc_xfer(p)) / &
@@ -1313,7 +1294,7 @@ contains
 
             col_plant_ndemand_vr(c,:) = col_plant_nh4demand_vr(c,:)+col_plant_no3demand_vr(c,:)
       
-        end if ! end of NH4, NO3 competition
+        end if
 
 
         do j = 1, nlevdecomp
@@ -1329,7 +1310,7 @@ contains
            ! Thus, the NH4 fluxes are increased, for itself and as a surrogate to meet the
            ! NO3 flux demands.
            
-           if ( supp_n ) then
+           if (carbon_only .or. carbonphosphorus_only) then
               
               if ( fpi_no3_vr(j) + fpi_nh4_vr(j) < 1._r8 ) then
                  fpi_vr(c,j) = 1._r8
@@ -1413,12 +1394,13 @@ contains
          !  update (1) actual immobilization for N and P (2) sminn_to_plant and sminp_to_plant
          !  We only resolve co-limitations when are supplementing neither element
          
-         if( (.not.supp_n) .and. (.not.supp_p) ) then
+         np_bothactive: if ( .not.carbon_only .and.  &
+              .not.carbonphosphorus_only .and. &
+              .not.carbonnitrogen_only ) then
 
            if (nu_com .eq. 'RD') then
               do j = 1, nlevdecomp
-
-                 if( fpi_vr(c,j) <=fpi_p_vr(c,j) )then ! more N limited
+                 if( fpi_vr(c,j) <= fpi_p_vr(c,j) )then ! more N limited
                     do k = 1, ndecomp_cascade_transitions
                        if (pmnf_decomp_cascade(c,j,k) > 0.0_r8 .and. pmpf_decomp_cascade(c,j,k) > 0.0_r8) then
                           actual_immob_p_vr(c,j) = actual_immob_p_vr(c,j) - pmpf_decomp_cascade(c,j,k)&
@@ -1503,7 +1485,7 @@ contains
 
               end do
            end if
-        endif
+        endif np_bothactive
 
         if(carbonnitrogen_only)then
            do j = 1, nlevdecomp
@@ -1527,7 +1509,7 @@ contains
         end do
 
         ! update column plant N/P demand, pft level plant NP uptake for ECA and MIC mode
-        if (nu_com .eq. 'ECA' .or. nu_com .eq. 'MIC') then
+        eca_filter: if (nu_com .eq. 'ECA' .or. nu_com .eq. 'MIC') then
 
            plant_ndemand_col(c) = 0._r8
            plant_pdemand_col(c) = 0._r8
@@ -1574,7 +1556,7 @@ contains
                  
            end do
 
-        end if
+        end if eca_filter
 
      end do col_loop
 
@@ -1645,8 +1627,8 @@ contains
         end if
      end do
 
-     ! for np imbalance
-     if (nu_com .ne. 'RD') then
+     ! for np imbalance (impacts fixation, NA with FATES)
+     if (nu_com .ne. 'RD' .and. .not.use_fates) then
         do fc=1,num_soilc
            c = filter_soilc(fc)
            do p = col_pp%pfti(c), col_pp%pftf(c)
@@ -1966,7 +1948,7 @@ contains
          supplement_to_plantp         => veg_pf%supplement_to_plantp          &
          )
 
-     !-------------------------------------------------------------------
+      !-------------------------------------------------------------------
       ! set time steps
 
       ! debug
@@ -2796,7 +2778,7 @@ contains
 
         !! Phosphorus
 
-        if( .not. carbonphosphorus_only.and. .not. carbonnitrogen_only.and. &
+        if( .not.carbonphosphorus_only .and. .not.carbonnitrogen_only .and. &
              .not. carbon_only )then
 
           temp_sminn_to_plant(bounds%begc:bounds%endc) = sminn_to_plant(bounds%begc:bounds%endc)
@@ -2930,10 +2912,10 @@ contains
     real(r8), intent(in)  :: km_decomp_nh4             ! km for microbial decomposer nh4 uptake
     real(r8), intent(in)  :: potential_immob_vr(:)     ! potential N immobilization [g/m3/s]
     real(r8), intent(inout) :: plant_nh4demand_vr(pci:,:) ! [g m-3 s-1] (m2 of col, not patch)
-    real(r8), intent(out) :: col_plant_nh4demand_vr(:) ! [g m-3 s-1] (m2 of col, not patch)
-    real(r8), intent(out) :: fpi_nh4_vr(:)             ! fraction of potential immobilization supplied by nh4 (no units)
-    real(r8), intent(out) :: actual_immob_nh4_vr(:)    ! actual nh4 immobilization [g/m3/s]
-    real(r8), intent(out) :: smin_nh4_to_plant_vr(:)   ! nh4 flux to plant competitors [g/s]
+    real(r8), intent(inout) :: col_plant_nh4demand_vr(:) ! [g m-3 s-1] (m2 of col, not patch)
+    real(r8), intent(inout) :: fpi_nh4_vr(:)             ! fraction of potential immobilization supplied by nh4 (no units)
+    real(r8), intent(inout) :: actual_immob_nh4_vr(:)    ! actual nh4 immobilization [g/m3/s]
+    real(r8), intent(inout) :: smin_nh4_to_plant_vr(:)   ! nh4 flux to plant competitors [g/s]
 
 
     ! NO3 specific arguments (all optional)
@@ -2946,12 +2928,12 @@ contains
     real(r8), intent(in)  :: pot_f_nit_vr(:)           ! potential soil nitrification flux [g/m3/s]
     real(r8), intent(in)  :: pot_f_denit_vr(:)         ! potential soil denitrification flux [g/m3/s]
     real(r8), intent(inout) :: plant_no3demand_vr(pci:,:) ! [gN m-3 s-1] (m2 of col, not patch)
-    real(r8), intent(out) :: col_plant_no3demand_vr(:) ! [gN m-3 s-1] (m2 of col, not patch)
-    real(r8), intent(out) :: fpi_no3_vr(:)             ! fraction of potential immobilization supplied by no3 (no units)
-    real(r8), intent(out) :: actual_immob_no3_vr(:)    ! actual no3 immobilization [gN/m3/s]
-    real(r8), intent(out) :: smin_no3_to_plant_vr(:)   ! no3 flux to plant competitors [g/s]
-    real(r8), intent(out) :: f_nit_vr(:)               ! soil nitrification flux [g/m3/s]
-    real(r8), intent(out) :: f_denit_vr(:)             ! soil nitrification flux [g/m3/s]
+    real(r8), intent(inout) :: col_plant_no3demand_vr(:) ! [gN m-3 s-1] (m2 of col, not patch)
+    real(r8), intent(inout) :: fpi_no3_vr(:)             ! fraction of potential immobilization supplied by no3 (no units)
+    real(r8), intent(inout) :: actual_immob_no3_vr(:)    ! actual no3 immobilization [gN/m3/s]
+    real(r8), intent(inout) :: smin_no3_to_plant_vr(:)   ! no3 flux to plant competitors [g/s]
+    real(r8), intent(inout) :: f_nit_vr(:)               ! soil nitrification flux [g/m3/s]
+    real(r8), intent(inout) :: f_denit_vr(:)             ! soil nitrification flux [g/m3/s]
 
 
     ! Locals
@@ -3256,14 +3238,14 @@ contains
     real(r8), intent(in) :: labilep_vr(:)
 
     real(r8), intent(inout) :: plant_pdemand_vr_patch(pci:,:)
-    real(r8), intent(out) :: col_plant_pdemand_vr(:)
-    real(r8), intent(out) :: adsorb_to_labilep_vr(:)
+    real(r8), intent(inout) :: col_plant_pdemand_vr(:)
+    real(r8), intent(inout) :: adsorb_to_labilep_vr(:)
 
-    real(r8), intent(out) :: fpi_p_vr(:)
-    real(r8), intent(out) :: actual_immob_p_vr(:)
-    real(r8), intent(out) :: sminp_to_plant_vr(:)
-    real(r8), intent(out) :: desorb_to_solutionp_vr(:)
-    real(r8), intent(out) :: supplement_to_sminp_vr(:)
+    real(r8), intent(inout) :: fpi_p_vr(:)
+    real(r8), intent(inout) :: actual_immob_p_vr(:)
+    real(r8), intent(inout) :: sminp_to_plant_vr(:)
+    real(r8), intent(inout) :: desorb_to_solutionp_vr(:)
+    real(r8), intent(inout) :: supplement_to_sminp_vr(:)
 
     ! Locals
     integer :: i,ip
@@ -3429,9 +3411,9 @@ contains
     real(r8), intent(in)  :: compet_decomp_nh4       ! relative competability of decomposers (unitless)
     real(r8), intent(in)  :: dt                      ! timestep [seconds]
     real(r8), intent(in)  :: smin_nh4_vr(:)          ! mineralized nh4 [g/m3]
-    real(r8), intent(out) :: fpi_nh4_vr(:)           ! fraction of potential immobilization supplied by nh4 (no units)
-    real(r8), intent(out) :: actual_immob_nh4_vr(:)  ! actual nh4 immobilization [g/m3/s]
-    real(r8), intent(out) :: smin_nh4_to_plant_vr(:) ! nh4 flux to plant competitors [g/m3/s]
+    real(r8), intent(inout) :: fpi_nh4_vr(:)           ! fraction of potential immobilization supplied by nh4 (no units)
+    real(r8), intent(inout) :: actual_immob_nh4_vr(:)  ! actual nh4 immobilization [g/m3/s]
+    real(r8), intent(inout) :: smin_nh4_to_plant_vr(:) ! nh4 flux to plant competitors [g/m3/s]
 
     ! Optional (for NO3)
     real(r8), intent(in)  :: smin_no3_vr(:)          ! mineralized no3 [g/m3]
@@ -3441,11 +3423,11 @@ contains
     real(r8), intent(in)  :: compet_denit            ! relative competitiveness of denitrifiers for NO3
     real(r8), intent(in)  :: pot_f_nit_vr(:)         ! potential soil nitrification flux [g/m3/s]
     real(r8), intent(in)  :: pot_f_denit_vr(:)       ! potential soil denitrification flux [g/m3/s]
-    real(r8), intent(out) :: fpi_no3_vr(:)           ! fraction of potential immobilization supplied by NO3
-    real(r8), intent(out) :: actual_immob_no3_vr(:)  ! actual no3 immobilization [g/m3/s]
-    real(r8), intent(out) :: smin_no3_to_plant_vr(:) ! no3 flux to plant competitors [g/m3/s]
-    real(r8), intent(out) :: f_nit_vr(:)             ! soil nitrification flux [g/m3/s]
-    real(r8), intent(out) :: f_denit_vr(:)           ! soil denitrification flux [g/m3/s]
+    real(r8), intent(inout) :: fpi_no3_vr(:)           ! fraction of potential immobilization supplied by NO3
+    real(r8), intent(inout) :: actual_immob_no3_vr(:)  ! actual no3 immobilization [g/m3/s]
+    real(r8), intent(inout) :: smin_no3_to_plant_vr(:) ! no3 flux to plant competitors [g/m3/s]
+    real(r8), intent(inout) :: f_nit_vr(:)             ! soil nitrification flux [g/m3/s]
+    real(r8), intent(inout) :: f_denit_vr(:)           ! soil denitrification flux [g/m3/s]
 
     ! Locals
     real(r8) :: sum_nh4_demand        ! Total nh4 demand over all competitors
@@ -3571,26 +3553,14 @@ contains
     real(r8), intent(in) :: potential_immob_p_vr(:)  ! potential P immobilization [g/m3/s]
     real(r8), intent(in) :: solutionp_vr(:)          ! soil mineral P   [g/m3]
     real(r8), intent(in) :: dt                       ! timestep in seconds
-    real(r8), intent(out) :: fpi_p_vr(:)             ! fraction of potential immobilization supplied by p
-    real(r8), intent(out) :: actual_immob_p_vr(:)    ! actual P immobilization [g/m3/s]
-    real(r8), intent(out) :: sminp_to_plant_vr(:)      ! P flux to plant competitors [g/m3/s]
-    real(r8), intent(out) :: supplement_to_sminp_vr(:)
+    real(r8), intent(inout) :: fpi_p_vr(:)             ! fraction of potential immobilization supplied by p
+    real(r8), intent(inout) :: actual_immob_p_vr(:)    ! actual P immobilization [g/m3/s]
+    real(r8), intent(inout) :: sminp_to_plant_vr(:)      ! P flux to plant competitors [g/m3/s]
+    real(r8), intent(inout) :: supplement_to_sminp_vr(:)
 
     ! Locals
     real(r8) :: sum_pdemand          ! Total phos demand over all competitors
     integer  :: j                     ! soil decomp layer loop
-
-    ! Trivial solution (P not turned on)
-    ! ------------------------------------------------------------------------------------
-    if ( carbon_only .or. carbonnitrogen_only ) then !.or. &
-       do j = 1, nlevdecomp
-          fpi_p_vr(j) = 1.0_r8
-          actual_immob_p_vr(j) = potential_immob_p_vr(j)
-          sminp_to_plant_vr(j) =  col_plant_pdemand_vr(j)
-          supplement_to_sminp_vr(j) = col_plant_pdemand_vr(j) + potential_immob_p_vr(j) - (solutionp_vr(j)/dt)
-       end do
-       return
-    end if
 
     do j = 1, nlevdecomp
 
@@ -3604,6 +3574,13 @@ contains
           actual_immob_p_vr(j) = potential_immob_p_vr(j)
           sminp_to_plant_vr(j) = col_plant_pdemand_vr(j)
 
+       elseif(carbon_only .or. carbonnitrogen_only    ) then
+
+          fpi_p_vr(j) = 1.0_r8
+          actual_immob_p_vr(j) = potential_immob_p_vr(j)
+          sminp_to_plant_vr(j) =  col_plant_pdemand_vr(j)
+          supplement_to_sminp_vr(j) = sum_pdemand - (solutionp_vr(j)/dt)
+          
        else
           ! P availability can not satisfy the sum of immobilization and
           ! plant growth demands, so these two demands compete for
