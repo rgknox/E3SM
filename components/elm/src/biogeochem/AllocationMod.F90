@@ -1058,7 +1058,7 @@ contains
         call calc_nuptake_prof(bounds, num_soilc, filter_soilc, cnstate_vars, nuptake_prof)
         call calc_puptake_prof(bounds, num_soilc, filter_soilc, cnstate_vars, puptake_prof)
 
-     elseif (nu_com .eq. 'ECA' .or. nu_com .eq. 'MIC') then
+     elseif ((nu_com .eq. 'ECA' .or. nu_com .eq. 'MIC') .and. .not.use_fates) then
 
         do fp=1,num_soilp
            p = filter_soilp(fp)
