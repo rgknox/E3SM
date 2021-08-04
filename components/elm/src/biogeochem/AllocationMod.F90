@@ -36,6 +36,9 @@ module AllocationMod
   use elm_varctl          , only : NFIX_PTASE_plant
   use ELMFatesInterfaceMod  , only : hlm_fates_interface_type
   use elm_varctl      , only: iulog
+  use elm_varctl      , only : carbon_only          
+  use elm_varctl      , only : carbonnitrogen_only  
+  use elm_varctl      , only : carbonphosphorus_only
   
   !
   implicit none
@@ -45,6 +48,7 @@ module AllocationMod
   private :: calc_puptake_prof
   !
   ! !PUBLIC MEMBER FUNCTIONS:
+  public :: EvaluateSupplStatus
   public :: readCNAllocParams
   public :: AllocationInit         ! Initialization
 !  public :: Allocation             ! run method
@@ -115,6 +119,11 @@ module AllocationMod
   real(r8), allocatable,target :: plant_no3demand_vr_fates(:,:) ! no3 demand per competitor per soil layer
   real(r8), allocatable,target :: plant_pdemand_vr_fates(:,:)   ! p demand per competitor per soil layer
 
+  logical :: do_eval_suppstat = .true. ! If this is true, continue to re-evaluate
+                                       ! the status of supplementation and use that
+                                       ! to toggle and update which processes are active. This will get set to false
+                                       ! after ad_carbon_only is complete.
+  
   ! ECA parameters
   ! scaling factor for plant fine root biomass to calculate nutrient carrier enzyme abundance                                         
   real(r8), parameter :: e_plant_scalar  = 0.0000125_r8 
@@ -204,12 +213,10 @@ contains
     !
     ! !USES:
     use elm_varcon      , only: secspday, spval
-    use clm_time_manager, only: get_step_size, get_curr_date
+    use clm_time_manager, only: get_step_size
     use elm_varpar      , only: crop_prog
     use elm_varctl      , only: iulog
-    use elm_varctl      , only : carbon_only          
-    use elm_varctl      , only : carbonnitrogen_only  
-    use elm_varctl      , only : carbonphosphorus_only
+    
 
     use shr_infnan_mod  , only: nan => shr_infnan_nan, assignment(=)
     use elm_varpar      , only: nlevdecomp
@@ -267,42 +274,84 @@ contains
     bdnr         = AllocParamsInst%bdnr * (dt/secspday)
     dayscrecover = AllocParamsInst%dayscrecover
 
-    ! Change namelist settings into private logical variables
-    select case(suplnitro)
-    case(suplnNon)
-        select case (suplphos)
-          case(suplpNon)
-             Carbon_only = .false.
-             CarbonNitrogen_only = .false.
-             CarbonPhosphorus_only=.false.
-             crop_supln  = .false.
-          case(suplpAll)
-             Carbon_only = .false.
-             CarbonNitrogen_only = .true.
-             CarbonPhosphorus_only=.false.
-             crop_supln  = .false.
-        end select
-    case(suplnAll)
-        select case (suplphos)
-          case(suplpNon)
-             Carbon_only = .false.
-             CarbonNitrogen_only = .false.
-             CarbonPhosphorus_only=.true.
-             crop_supln  = .false.
-          case(suplpAll)
-             Carbon_only = .true.
-             CarbonNitrogen_only = .false.
-             CarbonPhosphorus_only=.false.
-             crop_supln  = .false.
-        end select
-    case default
-       write(iulog,*) 'Supplemental Nitrogen flag (suplnitro) can only be: ', &
-            suplnNon, ' or ', suplnAll
-       call endrun(msg='ERROR: supplemental Nitrogen flag is not correct'//&
-            errMsg(__FILE__, __LINE__))
-    end select
+    call EvaluateSupplStatus()
+    
+    !$acc update device(carbon_only, carbonnitrogen_only,&
+    !$acc carbonphosphorus_only)
 
-    select case(nu_com)
+   end subroutine AllocationInit
+
+   ! ------------------------------------------------------------------------------------
+   
+   subroutine EvaluateSupplStatus()
+
+     use clm_time_manager, only: get_curr_date
+
+     ! This module evaluates the current status of N and P
+     ! supplementation, and uses that to set flags which indicates
+     ! if various processes should be conducted.
+     ! The state of supplementation can change, specifically
+     ! through the use of the nyears_ad_carbon_only setting.
+     ! Due to this, we need to re-evalaute the state of supplementation
+     ! and cross refernce it with the allocation hypothesis until
+     ! there is no further change in supplementation.
+
+     integer ::  yr, mon, day, sec
+
+     ! If we have already evaluated logic outside of the
+     ! ad_carbon_only phase, we do not need to re-evaluate this logic
+     ! again
+     if(.not.do_eval_suppstat) return
+
+     call get_curr_date(yr, mon, day, sec)
+     if (spinup_state == 1 .and. yr .le. nyears_ad_carbon_only) then
+
+        carbon_only = .true.
+        carbonnitrogen_only   = .false.
+        carbonphosphorus_only = .false.
+        crop_supln  = .false.
+        do_eval_suppstat = .true.
+        
+     else
+        
+        do_eval_suppstat = .false.
+        ! Change namelist settings into private logical variables
+        select case(suplnitro)
+        case(suplnNon)
+           select case (suplphos)
+           case(suplpNon)
+              carbon_only = .false.
+              carbonnitrogen_only = .false.
+              carbonphosphorus_only=.false.
+              crop_supln  = .false.
+           case(suplpAll)
+              carbon_only = .false.
+              carbonnitrogen_only = .true.
+              carbonphosphorus_only=.false.
+              crop_supln  = .false.
+           end select
+        case(suplnAll)
+           select case (suplphos)
+           case(suplpNon)
+              carbon_only = .false.
+              carbonnitrogen_only = .false.
+              carbonphosphorus_only=.true.
+              crop_supln  = .false.
+           case(suplpAll)
+              carbon_only = .true.
+              carbonnitrogen_only = .false.
+              carbonphosphorus_only=.false.
+              crop_supln  = .false.
+           end select
+        case default
+           write(iulog,*) 'Supplemental Nitrogen flag (suplnitro) can only be: ', &
+                suplnNon, ' or ', suplnAll
+           call endrun(msg='ERROR: supplemental Nitrogen flag is not correct'//&
+                errMsg(__FILE__, __LINE__))
+        end select
+     end if
+
+     select case(nu_com)
         case('RD') ! relative demand mode, same as CLM-CNP Yang 2014
             nu_com_leaf_physiology = .false.
             nu_com_root_kinetics   = .false.
@@ -319,36 +368,30 @@ contains
             nu_com_phosphatase = .true.
             nu_com_nfix = .true.
     end select
+
+     
     ! phosphorus conditions of plants are needed, in order to use new fixation and phosphatase
     ! activity subroutines, under carbon only or carbon nitrogen only mode, fixation and phosphatase
     ! activity are set to false
     if (carbon_only) then
-        nu_com_nfix = .false.
-        nu_com_phosphatase = .false.
+       nu_com_nfix = .false.
+       nu_com_phosphatase = .false.
     end if
     if (carbonnitrogen_only) then
-        nu_com_phosphatase = .false.
+       nu_com_phosphatase = .false.
     end if
-
-    call get_curr_date(yr, mon, day, sec)
-    if (spinup_state == 1 .and. yr .le. nyears_ad_carbon_only) then
-      Carbon_only = .true.
-     end if
-     !$acc update device(carbon_only, carbonnitrogen_only,&
-     !$acc carbonphosphorus_only)
-
-  end subroutine AllocationInit
-
-!-------------------------------------------------------------------------------------------------
+    
+    return
+  end subroutine EvaluateSupplStatus
+  
+  !-------------------------------------------------------------------------------------------------
+  
   subroutine Allocation1_PlantNPDemand (bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, &
        photosyns_vars, crop_vars, canopystate_vars, cnstate_vars, dt, yr)
     ! PHASE-1 of Allocation: loop over patches to assess the total plant N demand and P demand
     ! !USES:
     !$acc routine seq
     use elm_varctl       , only: iulog
-    use elm_varctl      , only : carbon_only          !
-    use elm_varctl      , only : carbonnitrogen_only  !
-    use elm_varctl      , only : carbonphosphorus_only!
     use pftvarcon        , only: npcropmin, declfact, bfact, aleaff, arootf, astemf, noveg
     use pftvarcon        , only: arooti, fleafi, allconsl, allconss, grperc, grpnow, nsoybean
     use elm_varpar       , only: nlevdecomp
@@ -503,10 +546,6 @@ contains
          benefit_pgpp_pleafc          => veg_ns%benefit_pgpp_pleafc     &
          )
 
-      ! set time steps
-      if (spinup_state == 1 .and. yr .gt. nyears_ad_carbon_only) then
-         carbon_only = .false.
-      end if
 
      ! loop over patches to assess the total plant N demand and P demand
       do fp=1,num_soilp
@@ -883,9 +922,6 @@ contains
    ! PHASE-2 of Allocation:  resolving N/P limitation
    ! !USES:
    !$acc routine seq
-   use elm_varctl      , only : carbon_only          !
-   use elm_varctl      , only : carbonnitrogen_only  !
-   use elm_varctl      , only : carbonphosphorus_only!
    use pftvarcon        , only: noveg
    use elm_varpar       , only: nlevdecomp, ndecomp_cascade_transitions
    use elm_varcon       , only: nitrif_n2o_loss_frac, secspday
@@ -921,9 +957,9 @@ contains
                         ! layer onto a fates uptake layer
 
    ! Fractional uptake profiles, that are proportional to root density
-   real(r8):: nuptake_prof(bounds%begc:bounds%endc,1:nlevdecomp)    
-   real(r8):: puptake_prof(bounds%begc:bounds%endc,1:nlevdecomp)
-
+   real(r8) :: nuptake_prof(bounds%begc:bounds%endc,1:nlevdecomp)    
+   real(r8) :: puptake_prof(bounds%begc:bounds%endc,1:nlevdecomp)
+   integer  :: yr, mon, day, sec
    integer  :: nc   ! clump index
    integer  :: pci, pcf                        ! (I)nitial and (F)inal plant competitor index
    real(r8), pointer :: veg_rootc_ptr(:,:)     ! points to either native ELM or FATES root carbon array
@@ -1747,9 +1783,6 @@ contains
     ! !USES:
       !$acc routine seq
     use elm_varctl       , only: iulog
-    use elm_varctl      , only : carbon_only          !
-    use elm_varctl      , only : carbonnitrogen_only  !
-    use elm_varctl      , only : carbonphosphorus_only!
     use pftvarcon        , only: noveg
     use pftvarcon        , only:  npcropmin, grperc, grpnow
     use elm_varpar       , only:  nlevdecomp
@@ -2895,9 +2928,6 @@ contains
     ! kinetics following  Zhu et al., 2016 DOI: 10.1002/2016JG003554
     ! ------------------------------------------------------------------------------------
     use elm_varpar      , only: nlevdecomp
-    use elm_varctl      , only : carbon_only          !
-    use elm_varctl      , only : carbonnitrogen_only  !
-    use elm_varctl      , only : carbonphosphorus_only!
     
     integer,  intent(in) :: pci               ! First index of plant comp arrays
     real(r8), intent(in) :: dt                ! Time step duration [s]
@@ -3210,8 +3240,6 @@ contains
        supplement_to_sminp_vr)
 
     use elm_varpar , only : nlevdecomp
-    use elm_varctl , only : carbon_only          !
-    use elm_varctl , only : carbonnitrogen_only  !
 
     integer,  intent(in) :: pci     ! initial and final index of plant competitors
     real(r8), intent(in) :: dt      ! integration timestep length (s)
@@ -3283,18 +3311,12 @@ contains
        e_km_p = e_km_p + e_decomp_scalar*decompmicc(j)/km_decomp_p + &
             max(0._r8,vmax_minsurf_p_vr(j)-labilep_vr(j))/km_minsurf_p_vr(j)
 
-!       if(carbon_only .or. carbonnitrogen_only) then
-!          do i = 1, n_pcomp
-!             compet_plant(i) = 1._r8
-!          end do
-!       else
-          do i = 1,n_pcomp
-             ip = filter_pcomp(i)
-             ft = ft_index(ip)
-             compet_plant(i) = solution_pconc / & 
-                  (km_plant_p(ft)*(1._r8 + solution_pconc/km_plant_p(ft) + e_km_p))
-          end do
-!       end if
+       do i = 1,n_pcomp
+          ip = filter_pcomp(i)
+          ft = ft_index(ip)
+          compet_plant(i) = solution_pconc / & 
+               (km_plant_p(ft)*(1._r8 + solution_pconc/km_plant_p(ft) + e_km_p))
+       end do
        
        compet_decomp_p = solution_pconc / &
             (km_decomp_p * (1._r8 + solution_pconc/km_decomp_p + e_km_p))
@@ -3552,7 +3574,6 @@ contains
        sminp_to_plant_vr,    &    ! OUT (j)
        supplement_to_sminp_vr)    ! OUT (j)
 
-    use elm_varctl       , only:  carbon_only, carbonnitrogen_only
     use elm_varpar, only : nlevdecomp
 
     ! Arguments
