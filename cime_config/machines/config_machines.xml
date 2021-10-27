@@ -2875,6 +2875,9 @@
       </arguments>
     </mpirun>
     <module_system type="none"/>
+	 <environment_variables compiler="gnu" > 
+		<env name="CMAKE_ROOT">/usr/local/share/cmake-3.21/</env>
+	 </environment_variables>
   </machine>
 
   <machine MACH="summit">
