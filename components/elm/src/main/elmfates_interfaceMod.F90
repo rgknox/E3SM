@@ -839,7 +839,8 @@ contains
       ! ---------------------------------------------------------------------------------
       call fates_hist%update_history_dyn( nc,                    &
            this%fates(nc)%nsites, &
-           this%fates(nc)%sites) 
+           this%fates(nc)%sites,  &
+           this%fates(nc)%bc_in) 
 
       if (masterproc) then
          write(iulog, *) 'FATES dynamics complete'
@@ -1423,7 +1424,8 @@ contains
                ! ------------------------------------------------------------------------
                call fates_hist%update_history_dyn( nc, &
                     this%fates(nc)%nsites,                 &
-                    this%fates(nc)%sites) 
+                    this%fates(nc)%sites, &
+                    this%fates(nc)%bc_in) 
 
                
             end if
@@ -1553,7 +1555,8 @@ contains
            ! ------------------------------------------------------------------------
            call fates_hist%update_history_dyn( nc, &
                 this%fates(nc)%nsites,                 &
-                this%fates(nc)%sites) 
+                this%fates(nc)%sites, &
+                this%fates(nc)%bc_in) 
 
            
 
