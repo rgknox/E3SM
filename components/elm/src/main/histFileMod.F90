@@ -1742,7 +1742,8 @@ contains
     !
     ! !USES:
     use elm_varpar      , only : nlevgrnd, nlevsno, nlevlak, nlevurb, numrad, nmonth
-    use elm_varpar      , only : natpft_size, cft_size, maxpatch_glcmec, nlevdecomp_full, nlevtrc_full, nvegwcs
+    use elm_varpar      , only : natpft_size, cft_size, maxpatch_glcmec, nlevdecomp_full
+    use elm_varpar      , only : nlevtrc_full, nvegwcs, nlevsoi
     use landunit_varcon , only : max_lunit
     use elm_varctl      , only : caseid, ctitle, fsurdat, finidat, paramfile
     use elm_varctl      , only : version, hostname, username, conventions, source
@@ -1894,6 +1895,7 @@ contains
 
     ! "level" dimensions
     call ncd_defdim(lnfid, 'levgrnd', nlevgrnd, dimid)
+    call ncd_defdim(lnfid, 'levsoi', nlevsoi, dimid)
     if (nlevurb > 0) then
        call ncd_defdim(lnfid, 'levurb' , nlevurb, dimid)
     end if
@@ -2333,6 +2335,7 @@ contains
     ! contents.
     !
     ! !USES:
+    use elm_varpar      , only : nlevsoi
     use elm_varcon      , only : zsoi, zlak, secspday
     use domainMod       , only : ldomain, lon1d, lat1d
     use clm_time_manager, only : get_nstep, get_curr_date, get_curr_time
@@ -2422,7 +2425,11 @@ contains
                 long_name='coordinate lake levels', units='m', ncid=nfid(t))
           call ncd_defvar(varname='levdcmp', xtype=tape(t)%ncprec, dim1name='levdcmp', &
                 long_name='coordinate soil levels', units='m', ncid=nfid(t))
-
+          call ncd_defvar(varname='levsoi', xtype=tape(t)%ncprec, &
+               dim1name='levsoi', &
+               long_name='coordinate soil levels (equivalent to top nlevsoi levels of levgrnd)', &
+               units='m', ncid=nfid(t))
+          
           if(use_fates)then
 
              call ncd_defvar(varname='fates_levscls', xtype=tape(t)%ncprec, dim1name='fates_levscls', &
@@ -2498,6 +2505,7 @@ contains
           if ( masterproc ) write(iulog, *) ' zsoi:',zsoi
           call ncd_io(varname='levgrnd', data=zsoi, ncid=nfid(t), flag='write')
           call ncd_io(varname='levlak' , data=zlak, ncid=nfid(t), flag='write')
+          call ncd_io(varname='levsoi', data=zsoi(1:nlevsoi), ncid=nfid(t), flag='write')
           if (use_vertsoilc) then
              call ncd_io(varname='levdcmp', data=zsoi, ncid=nfid(t), flag='write')
           else
@@ -4646,7 +4654,7 @@ contains
     !
     ! !USES:
     use elm_varpar      , only : nlevgrnd, nlevsno, nlevlak, numrad, nlevdecomp_full, nlevtrc_soil, nmonth, nvegwcs
-    use elm_varpar      , only : natpft_size, cft_size, maxpatch_glcmec
+    use elm_varpar      , only : natpft_size, cft_size, maxpatch_glcmec, nlevsoi
     use landunit_varcon , only : max_lunit
     !
     ! !ARGUMENTS:
@@ -4723,6 +4731,8 @@ contains
     select case (type2d)
     case ('levgrnd')
        num2d = nlevgrnd
+    case ('levsoi')
+       num2d = nlevsoi
     case ('levlak')
        num2d = nlevlak
     case ('numrad')
@@ -4810,7 +4820,7 @@ contains
     case default
        write(iulog,*) trim(subname),' ERROR: unsupported 2d type ',type2d, &
           ' currently supported types for multi level fields are: ', &
-          '[levgrnd,levlak,numrad,nmonthlevdcmp,levtrc,ltype,natpft,cft,glc_nec,elevclas,levsno]'
+          '[levgrnd,levsoi,levlak,numrad,nmonthlevdcmp,levtrc,ltype,natpft,cft,glc_nec,elevclas,levsno]'
        call endrun(msg=errMsg(__FILE__, __LINE__))
     end select
 
