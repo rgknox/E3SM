@@ -175,57 +175,24 @@ contains
 
                 smax_c = vmax_minsurf_p_vr(isoilorder(c),j)
                 ks_sorption_c = km_minsurf_p_vr(isoilorder(c),j)
-                temp_solutionp(c,j) = col_ps%solutionp_vr(c,j) + col_ps%labilep_vr(c,j) + &
-                     (flux_mineralization(c,j) + col_pf%primp_to_labilep_vr(c,j)*dt + &
-                     col_pf%secondp_to_labilep_vr(c,j)*dt + col_pf%supplement_to_sminp_vr(c,j)*dt - &
-                     col_pf%sminp_to_plant_vr(c,j)*dt - col_pf%labilep_to_secondp_vr(c,j)*dt - &
-                     col_pf%sminp_leached_vr(c,j)*dt )
+                temp_solutionp(c,j) = ( col_ps%solutionp_vr(c,j) + col_ps%labilep_vr(c,j) + &
+                            (flux_mineralization(c,j) + col_pf%primp_to_labilep_vr(c,j)*dt + &
+                            col_pf%secondp_to_labilep_vr(c,j)*dt + col_pf%supplement_to_sminp_vr(c,j)*dt - &
+                            col_pf%sminp_to_plant_vr(c,j)*dt - col_pf%labilep_to_secondp_vr(c,j)*dt - &
+                            col_pf%sminp_leached_vr(c,j)*dt ))
 
-                
-
-                
-                if (temp_solutionp(c,j) < 0.0_r8) then
-
-                   if(.false.)then
-                      print*,"cj",c,j
-                      print*,"solp:",col_ps%solutionp_vr(c,j)
-                      print*,"labp:",col_ps%labilep_vr(c,j)
-                      print*,"flux min:",flux_mineralization(c,j)
-                      print*,"primp_to_lab:",col_pf%primp_to_labilep_vr(c,j)*dt
-                      print*,"secon_to_lab:",col_pf%secondp_to_labilep_vr(c,j)*dt
-                      print*,"supp_to_sminp:",col_pf%supplement_to_sminp_vr(c,j)*dt
-                      print*,"smin_to_plant:",col_pf%sminp_to_plant_vr(c,j)*dt
-                      print*,"lab_to_secondp:",col_pf%labilep_to_secondp_vr(c,j)*dt
-                      print*,"smin_leached:",col_pf%sminp_leached_vr(c,j)*dt
-                      do k = 1, ndecomp_cascade_transitions
-                         if ( cascade_receiver_pool(k) /= 0 ) then  ! skip terminal transitions
-                            ! column loop
-                            print*,"nonz",c,k,j,col_pf%decomp_cascade_sminp_flux_vr(c,j,k)*dt
-                         else
-                            print*,"z-casc",c,k,j,col_pf%decomp_cascade_sminp_flux_vr(c,j,k)*dt
-                         endif
-                      end do
-                      print*,"bgchem pmin: ",col_pf%biochem_pmin_vr(c,j)*dt
-                   end if
-                   
-                   if((col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))>0._r8) then
-                      col_pf%labilep_to_secondp_vr(c,j) = col_pf%labilep_to_secondp_vr(c,j)/ &
-                           (col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))* &
-                           (temp_solutionp(c,j) + col_pf%labilep_to_secondp_vr(c,j)*dt + &
-                           col_pf%sminp_leached_vr(c,j)*dt) /dt
-                      col_pf%sminp_leached_vr(c,j) = col_pf%sminp_leached_vr(c,j)/ &
-                           (col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))* &
-                           (temp_solutionp(c,j) + col_pf%labilep_to_secondp_vr(c,j)*dt + &
-                           col_pf%sminp_leached_vr(c,j)*dt) /dt
-                   else
-
-                      col_pf%primp_to_labilep_vr(c,j) = col_pf%primp_to_labilep_vr(c,j) + &
-                           temp_solutionp(c,j)/dt
-                      
-                   end if
-                   temp_solutionp(c,j) = 0.0_r8
-                   col_ps%solutionp_vr(c,j) = 0.0_r8
-                   col_ps%labilep_vr(c,j) = 0.0_r8
+                 if (temp_solutionp(c,j) < 0.0_r8) then
+                    col_pf%labilep_to_secondp_vr(c,j) = col_pf%labilep_to_secondp_vr(c,j)/ &
+                            (col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))* &
+                            (temp_solutionp(c,j) + col_pf%labilep_to_secondp_vr(c,j)*dt + &
+                            col_pf%sminp_leached_vr(c,j)*dt) /dt
+                    col_pf%sminp_leached_vr(c,j) = col_pf%sminp_leached_vr(c,j)/ &
+                            (col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))* &
+                            (temp_solutionp(c,j) + col_pf%labilep_to_secondp_vr(c,j)*dt + &
+                            col_pf%sminp_leached_vr(c,j)*dt) /dt
+                       temp_solutionp(c,j) = 0.0_r8
+                       col_ps%solutionp_vr(c,j) = 0.0_r8
+                       col_ps%labilep_vr(c,j) = 0.0_r8
                  else
                        ! sorbp = smax*solutionp/(ks+solutionp)
                        ! sorbp + solutionp = smax*solutionp/(ks+solutionp) + solutionp = total p pool after competition
