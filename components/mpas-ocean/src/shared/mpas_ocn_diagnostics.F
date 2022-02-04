@@ -1150,7 +1150,6 @@ contains
       real(kind=RKIND) :: coef, shearSquared, delU2, shearMean
       integer :: iCell, k, i, iEdge
       integer :: nCells
-      real(kind=RKIND) :: invAreaCell1
 
       !
       ! Brunt-Vaisala frequency (this has units of s^{-2})
@@ -1783,8 +1782,10 @@ contains
          ssh(iCell) = zTop(minLevelCell(iCell),iCell)
 
       end do
+#ifndef MPAS_OPENACC
       !$omp end do
       !$omp end parallel
+#endif
 
    end subroutine ocn_diagnostic_solve_z_coordinates!}}}
 

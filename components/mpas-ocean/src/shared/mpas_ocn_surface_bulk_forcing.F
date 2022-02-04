@@ -312,10 +312,8 @@ contains
       !
       !-----------------------------------------------------------------
 
-      integer :: iCell, nCells, nEdges
+      integer :: iCell, nCells
       integer, dimension(:), pointer :: nCellsArray
-
-      integer, dimension(:,:), pointer :: cellsOnEdge
 
       real (kind=RKIND), dimension(:), pointer :: evaporationFlux, snowFlux
       real (kind=RKIND), dimension(:), pointer :: seaIceFreshWaterFlux, icebergFreshWaterFlux, riverRunoffFlux, iceRunoffFlux
@@ -542,7 +540,7 @@ contains
       ! indices on tracerGroup are (iTracer, iLevel, iCell)
       if (.not. bulkThicknessFluxOff) then
          !$omp parallel
-         !$omp do schedule(runtime)
+         !$omp do schedule(runtime) private(surfaceTemperatureFluxWithoutRunoff)
          do iCell = 1, nCells
 
            ! Accumulate fluxes that use the surface temperature
