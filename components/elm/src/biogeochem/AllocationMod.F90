@@ -982,6 +982,8 @@ contains
    integer  :: pci, pcf                        ! (I)nitial and (F)inal plant competitor index
    real(r8), pointer :: veg_rootc_ptr(:,:)     ! points to either native ELM or FATES root carbon array
    integer, pointer  :: ft_index_ptr(:)        ! points to either native ELM or FATES PFT array
+   real(r8), pointer :: cn_scalar_runmean_ptr(:)
+   real(r8), pointer :: cp_scalar_runmean_ptr(:)
    real(r8), pointer :: plant_nh4demand_vr_ptr(:,:)
    real(r8), pointer :: plant_no3demand_vr_ptr(:,:)
    real(r8), pointer :: plant_pdemand_vr_ptr(:,:)
