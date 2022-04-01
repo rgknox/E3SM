@@ -900,7 +900,8 @@ verbose_output = .false.
       ! subroutine define_history_vars()
       ! ---------------------------------------------------------------------------------
       call fates_hist%flush_hvars(nc,upfreq_in=1)
-
+      call fates_hist%flush_hvars(nc,upfreq_in=5)
+      
 
       ! ---------------------------------------------------------------------------------
       ! Part II: Call the FATES model now that input boundary conditions have been
@@ -1490,6 +1491,7 @@ verbose_output = .false.
                   ! This call sends internal fates variables into the
                   ! output boundary condition structures. Note: this is called
                   ! internally in fates dynamics as well.
+
                   call FluxIntoLitterPools(this%fates(nc)%sites(s), &
                        this%fates(nc)%bc_in(s), &
                        this%fates(nc)%bc_out(s))
@@ -1546,9 +1548,6 @@ verbose_output = .false.
                        this%fates(nc)%bc_out)
                end if
 
-
-
-
                ! ------------------------------------------------------------------------
                ! Update diagnostics of FATES ecosystem structure used in HLM.
                ! ------------------------------------------------------------------------
@@ -1566,6 +1565,7 @@ verbose_output = .false.
                ! Update history IO fields that depend on ecosystem dynamics
                ! ------------------------------------------------------------------------
                call fates_hist%flush_hvars(nc,upfreq_in=1)
+               !!call fates_hist%flush_hvars(nc,upfreq_in=5)
                do s = 1,this%fates(nc)%nsites
                   call fates_hist%zero_site_hvars(this%fates(nc)%sites(s),     &
                        upfreq_in=1)
@@ -1707,6 +1707,7 @@ verbose_output = .false.
               ! This call sends internal fates variables into the
               ! output boundary condition structures. Note: this is called
               ! internally in fates dynamics as well.
+
               call FluxIntoLitterPools(this%fates(nc)%sites(s), &
                    this%fates(nc)%bc_in(s), &
                    this%fates(nc)%bc_out(s))
@@ -1723,9 +1724,12 @@ verbose_output = .false.
            ! ------------------------------------------------------------------------
 
            call fates_hist%flush_hvars(nc,upfreq_in=1)
+           call fates_hist%flush_hvars(nc,upfreq_in=5)
            do s = 1,this%fates(nc)%nsites
               call fates_hist%zero_site_hvars(this%fates(nc)%sites(s),     &
                    upfreq_in=1)
+              call fates_hist%zero_site_hvars(this%fates(nc)%sites(s),     &
+                   upfreq_in=5)
            end do
            call fates_hist%update_history_dyn( nc, &
                 this%fates(nc)%nsites,                 &
