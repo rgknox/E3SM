@@ -2003,7 +2003,7 @@
     <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
     <EXEROOT>$CIME_OUTPUT_ROOT/$CASE/bld</EXEROOT>
     <TEST_TPUT_TOLERANCE>0.05</TEST_TPUT_TOLERANCE>
-    <TEST_MEMLEAK_TOLERANCE>0.05</TEST_MEMLEAK_TOLERANCE>
+    <!-- <TEST_MEMLEAK_TOLERANCE>0.05</TEST_MEMLEAK_TOLERANCE> -->
     <MAX_GB_OLD_TEST_DATA>1000</MAX_GB_OLD_TEST_DATA>
     <environment_variables>
       <env name="PERL5LIB">/lcrc/group/e3sm/soft/perl/chrys/lib/perl5</env>
@@ -3737,7 +3737,7 @@
     <DESC>small developer workhorse at lbl climate sciences</DESC>
     <OS>LINUX</OS>
     <COMPILERS>gnu</COMPILERS>
-    <MPILIBS>mpi-serial</MPILIBS>
+    <MPILIBS>mpi-serial,openmpi</MPILIBS>
     <PROJECT>ngeet</PROJECT>
     <CIME_OUTPUT_ROOT>/raid1/lbleco/e3sm/</CIME_OUTPUT_ROOT>
     <DIN_LOC_ROOT>/raid1/lbleco/cesm/cesm_input_datasets/</DIN_LOC_ROOT>
@@ -3754,7 +3754,7 @@
     <mpirun mpilib="mpi-serial">
       <executable/>
     </mpirun>
-    <mpirun mpilib="default">
+    <mpirun mpilib="openmpi">
       <executable>mpirun</executable>
       <arguments>
         <arg name="num_tasks">-np {{ total_tasks }}</arg>
@@ -3762,6 +3762,9 @@
       </arguments>
     </mpirun>
     <module_system type="none"/>
+    <environment_variables compiler="gnu" > 
+      <env name="CMAKE_ROOT">/usr/local/share/cmake-3.21/</env>
+    </environment_variables>
   </machine>
 
   <machine MACH="summit">
