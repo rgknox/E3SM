@@ -1169,7 +1169,7 @@ contains
                     ! JUST USING THE NH4 VMAX PARAMETER FOR UPTAKE
                     col_plant_ndemand_vr(c,j) = col_plant_ndemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         elm_fates%fates(ci)%bc_pconst%eca_vmax_nh4(ft)
+                         elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft)
 
                     col_plant_pdemand_vr(c,j) = col_plant_pdemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
@@ -1194,7 +1194,7 @@ contains
               cn_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cn_scalar          ! (i,j)
               plant_nh4demand_vr_ptr => plant_nh4demand_vr_fates
               km_nh4_ptr             => elm_fates%fates(ci)%bc_pconst%eca_km_nh4
-              vmax_nh4_ptr           => elm_fates%fates(ci)%bc_pconst%eca_vmax_nh4
+              vmax_nh4_ptr           => elm_fates%fates(ci)%bc_pconst%vmax_nh4
               plant_no3demand_vr_ptr => plant_no3demand_vr_fates
               km_no3_ptr             => elm_fates%fates(ci)%bc_pconst%eca_km_no3
               vmax_no3_ptr           => elm_fates%fates(ci)%bc_pconst%eca_vmax_no3
@@ -1759,7 +1759,7 @@ contains
                     ndemand=0._r8
                     do j = 1,nlevdecomp
                        ndemand = ndemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                            elm_fates%fates(ci)%bc_pconst%eca_vmax_nh4(ft) * &
+                            elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft) * &
                             dzsoi_decomp(j)
                     end do
                     
