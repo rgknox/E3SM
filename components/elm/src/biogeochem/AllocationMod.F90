@@ -1169,7 +1169,8 @@ contains
                     ! JUST USING THE NH4 VMAX PARAMETER FOR UPTAKE
                     col_plant_ndemand_vr(c,j) = col_plant_ndemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft)
+                         (elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft) + &
+                          elm_fates%fates(ci)%bc_pconst%vmax_no3(ft))
 
                     col_plant_pdemand_vr(c,j) = col_plant_pdemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
