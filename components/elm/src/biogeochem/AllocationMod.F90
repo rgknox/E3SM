@@ -1174,7 +1174,7 @@ contains
 
                     col_plant_pdemand_vr(c,j) = col_plant_pdemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         elm_fates%fates(ci)%bc_pconst%eca_vmax_p(ft)
+                         elm_fates%fates(ci)%bc_pconst%vmax_p(ft)
                     
                  end do
                  
@@ -1198,11 +1198,11 @@ contains
               vmax_nh4_ptr           => elm_fates%fates(ci)%bc_pconst%vmax_nh4
               plant_no3demand_vr_ptr => plant_no3demand_vr_fates
               km_no3_ptr             => elm_fates%fates(ci)%bc_pconst%eca_km_no3
-              vmax_no3_ptr           => elm_fates%fates(ci)%bc_pconst%eca_vmax_no3
+              vmax_no3_ptr           => elm_fates%fates(ci)%bc_pconst%vmax_no3
               cp_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cp_scalar
               plant_pdemand_vr_ptr   => plant_pdemand_vr_fates
               km_p_ptr               => elm_fates%fates(ci)%bc_pconst%eca_km_p
-              vmax_p_ptr             => elm_fates%fates(ci)%bc_pconst%eca_vmax_p
+              vmax_p_ptr             => elm_fates%fates(ci)%bc_pconst%vmax_p
 
            end if
 
@@ -1788,7 +1788,7 @@ contains
                   do j = 1,nlevdecomp
                      ! [gP/m2/s]
                      pdemand = pdemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                          elm_fates%fates(ci)%bc_pconst%eca_vmax_p(ft) * &
+                          elm_fates%fates(ci)%bc_pconst%vmax_p(ft) * &
                           dzsoi_decomp(j)
                   end do
                   do j = 1,nlevdecomp
