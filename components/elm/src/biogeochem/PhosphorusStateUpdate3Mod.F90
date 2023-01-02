@@ -181,9 +181,10 @@ contains
                             col_pf%sminp_to_plant_vr(c,j)*dt - col_pf%labilep_to_secondp_vr(c,j)*dt - &
                             col_pf%sminp_leached_vr(c,j)*dt ))
 
-                 if (temp_solutionp(c,j) < 0.0_r8) then
-                    col_pf%labilep_to_secondp_vr(c,j) = col_pf%labilep_to_secondp_vr(c,j)/ &
-                            (col_pf%labilep_to_secondp_vr(c,j)+col_pf%sminp_leached_vr(c,j))* &
+                if (temp_solutionp(c,j) < 0.0_r8) then
+
+                    col_pf%labilep_to_secondp_vr(c,j) = max(col_pf%labilep_to_secondp_vr(c,j),1.e-15)/ &
+                            (max(col_pf%labilep_to_secondp_vr(c,j),1.e-15)+col_pf%sminp_leached_vr(c,j))* &
                             (temp_solutionp(c,j) + col_pf%labilep_to_secondp_vr(c,j)*dt + &
                             col_pf%sminp_leached_vr(c,j)*dt) /dt
                     col_pf%sminp_leached_vr(c,j) = col_pf%sminp_leached_vr(c,j)/ &
