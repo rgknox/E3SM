@@ -233,8 +233,6 @@ subroutine crm_physics_register()
    ! this seemed to be the cleanest solution for the time being (in other
    ! words, this is probably a lazy hack because I could not think of a
    ! cleaner way of passing these)
-   call pbuf_add_field('CRM_DTAU', 'physpkg', dtype_r8,dims_crm_3D,idx)
-   call pbuf_add_field('CRM_EMIS', 'physpkg', dtype_r8,dims_crm_3D,idx)
    call pbuf_add_field('CRM_REL' , 'physpkg', dtype_r8,dims_crm_3D,idx)
    call pbuf_add_field('CRM_REI' , 'physpkg', dtype_r8,dims_crm_3D,idx)
 
@@ -886,6 +884,15 @@ subroutine crm_physics_tend(ztodt, state, tend, ptend, pbuf2d, cam_in, cam_out, 
             call pbuf_set_field(pbuf_chunk, pbuf_get_index('TK_CRM'), 0.0_r8 )
          end if 
 #endif
+         !------------------------------------------------------------------------------------------
+         ! zero output fluxes to avoid error in check_energy_chng()
+         !------------------------------------------------------------------------------------------
+         do i = 1,ncol
+            mmf_qchk_prec_dp(c,i) = 0.0
+            mmf_qchk_snow_dp(c,i) = 0.0
+            mmf_rad_flux(c,i) = 0.0
+         end do ! i = 1,ncol
+
          !------------------------------------------------------------------------------------------
          !------------------------------------------------------------------------------------------
       end do ! c=begchunk, endchunk

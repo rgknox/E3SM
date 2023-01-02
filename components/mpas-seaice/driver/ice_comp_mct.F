@@ -380,8 +380,8 @@ contains
     ! Process namelist and streams files
     ! ----------
     ! Override the names of the stream and namelist files
-    domain % namelist_filename = 'mpassi_in'
-    domain % streams_filename = 'streams.seaice'
+    domain % namelist_filename = 'mpassi_in' // trim(inst_suffix)
+    domain % streams_filename = 'streams.seaice' // trim(inst_suffix)
 
     ! Setup namelist variables, and read the namelist
     ierr = domain % core % setup_namelist(domain % configs, domain % namelist_filename, domain % dminfo)
@@ -2544,6 +2544,7 @@ contains
             i2x_i % rAttr(index_i2x_Si_tref  ,n)  = atmosReferenceTemperature2m(i)
             i2x_i % rAttr(index_i2x_Si_qref  ,n)  = atmosReferenceHumidity2m(i)
             i2x_i % rAttr(index_i2x_Si_snowh ,n)  = snowVolumeCell(i) / ailohi
+            i2x_i % rAttr(index_i2x_Si_ithick,n)  = iceVolumeCell(i) / ailohi
 
             !--- a/i fluxes computed by ice
             i2x_i % rAttr(index_i2x_Faii_taux ,n) = tauxa
