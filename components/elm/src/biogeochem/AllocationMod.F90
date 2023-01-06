@@ -1756,17 +1756,17 @@ contains
               if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
                  do f = 1,n_pcomp
 
+                    ft = elm_fates%fates(ci)%bc_out(s)%ft_index(f)
+                    
                     ! [gN/m2/s]
                     ndemand=0._r8
                     do j = 1,nlevdecomp
                        ndemand = ndemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                            elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft) * &
+                            (elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft)+elm_fates%fates(ci)%bc_pconst%vmax_no3(ft)) * &
                             dzsoi_decomp(j)
                     end do
                     
                     do j = 1,nlevdecomp
-
-                       ft = elm_fates%fates(ci)%bc_out(s)%ft_index(f)
 
                        elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = & 
                             elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
