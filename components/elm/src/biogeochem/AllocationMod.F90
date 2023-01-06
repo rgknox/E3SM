@@ -1784,6 +1784,7 @@ contains
             
             if( plant_pdemand_col(c)>tiny(plant_pdemand_col(c)) ) then
                do f = 1,n_pcomp
+                  ft = elm_fates%fates(ci)%bc_out(s)%ft_index(f)
                   pdemand=0._r8
                   do j = 1,nlevdecomp
                      ! [gP/m2/s]
