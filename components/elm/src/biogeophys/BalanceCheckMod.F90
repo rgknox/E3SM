@@ -637,7 +637,7 @@ contains
           write(iulog,*)'WARNING:: BalanceCheck, solar radiation balance error (W/m2)'
           write(iulog,*)'nstep         = ',nstep
           write(iulog,*)'errsol        = ',errsol(indexp)
-          if (abs(errsol(indexp)) > 1.e-5_r8 ) then
+          !!if (abs(errsol(indexp)) > 1.e-5_r8 ) then
              write(iulog,*)'elm model is stopping - error is greater than 1e-5 (W/m2)'
              write(iulog,*)'fsa           = ',fsa(indexp)
              write(iulog,*)'fsr           = ',fsr(indexp)
@@ -646,10 +646,18 @@ contains
              write(iulog,*)'forc_solai(1) = ',forc_solai(indext,1)
              write(iulog,*)'forc_solai(2) = ',forc_solai(indext,2)
              write(iulog,*)'forc_tot      = ',forc_solad(indext,1)+forc_solad(indext,2) &
-               +forc_solai(indext,1)+forc_solai(indext,2)
+                  +forc_solai(indext,1)+forc_solai(indext,2)
+             write(iulog,*)'is_fates?:',veg_pp%is_fates(indexp)
+             write(iulog,*)'c: ',veg_pp%column(indexp)
+             write(iulog,*)'c itype: ',col_pp%itype(veg_pp%column(indexp))
+             write(iulog,*)'pfti: ',col_pp%pfti(veg_pp%column(indexp))
+             write(iulog,*)'p-pfti: ',indexp - col_pp%pfti(veg_pp%column(indexp))
              write(iulog,*)'elm model is stopping'
+             write(iulog,*)'fsa(p): ',surfalb_vars%fabi_patch(indexp,1),surfalb_vars%fabd_patch(indexp,1)
+             ! fsa(p) + fsr(p)
+             ! fsa(p)  = cad(p,ib) + cai(p,ib) + trd(p,ib)*(1._r8-albsod(c,ib)) + tri(p,ib)*(1._r8-albsoi(c,ib))
              call endrun(decomp_index=indexp, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
-          end if
+          !!end if
 #endif
        end if
 

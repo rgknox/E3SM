@@ -540,7 +540,6 @@ contains
             soilhydrology_vars )
        call t_stopf('begwbal')
 
-
        call t_startf('begcnpbal')
        ! call veg summary before col summary, for p2c
        if (use_cn) then
@@ -1355,7 +1354,8 @@ contains
                filter_inactive_and_active(nc)%urbanp,           &
                nextsw_cday, declinp1,                           &
                aerosol_vars, canopystate_vars, &
-               lakestate_vars, surfalb_vars )
+               lakestate_vars, surfalb_vars, top_af )
+          
           call t_stopf('surfalb')
 
           ! Albedos for urban columns

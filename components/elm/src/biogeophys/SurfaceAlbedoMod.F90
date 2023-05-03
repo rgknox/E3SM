@@ -33,6 +33,9 @@ module SurfaceAlbedoMod
   use elm_instMod , only : alm_fates
   use topounit_varcon   , only : max_topounits  
   use TopounitType      , only : top_pp
+  Use TopounitDataType  , only : topounit_atmospheric_flux
+
+
   !
   implicit none
   save
@@ -63,8 +66,10 @@ contains
         num_urbanp   , filter_urbanp,  &
         nextsw_cday  , declinp1,       &
         aerosol_vars, canopystate_vars, &
-        lakestate_vars, surfalb_vars &
-        )
+        lakestate_vars, surfalb_vars,  &
+        top_af_vars )
+    
+    
     ! !DESCRIPTION:
     ! Surface albedo and two-stream fluxes
     ! Surface albedos. Also fluxes (per unit incoming direct and diffuse
@@ -72,7 +77,7 @@ contains
     ! Calculate sunlit and shaded fluxes as described by
     ! Bonan et al (2011) JGR, 116, doi:10.1029/2010JG001593 and extended to
     ! a multi-layer canopy to calculate APAR profile
-     !
+    !
     ! The calling sequence is:
     ! -> SurfaceAlbedo:  albedos for next time step
     !    -> SoilAlbedo:  soil/lake/glacier/wetland albedos
@@ -111,6 +116,8 @@ contains
     type(canopystate_type) , intent(in)    :: canopystate_vars
     type(lakestate_type)   , intent(in)    :: lakestate_vars
     type(surfalb_type)     , intent(inout) :: surfalb_vars
+    type(topounit_atmospheric_flux), intent(in) :: top_af_vars
+    
     !
     ! !LOCAL VARIABLES:
     integer  :: i                                                                         ! index for layers [idx]
@@ -936,7 +943,7 @@ contains
        call alm_fates%wrap_canopy_radiation(bounds, &
             num_vegsol, filter_vegsol, &
             coszen_patch(bounds%begp:bounds%endp), &
-            surfalb_vars)
+            surfalb_vars, top_af_vars)
 #endif
     else
     

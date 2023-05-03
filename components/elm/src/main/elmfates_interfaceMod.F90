@@ -140,7 +140,7 @@ module ELMFatesInterfaceMod
    use EDInitMod             , only : init_patches
    use EDInitMod             , only : set_site_properties
    use EDPftVarcon           , only : EDpftvarcon_inst
-   use EDSurfaceRadiationMod , only : ED_SunShadeFracs, ED_Norman_Radiation
+   use EDSurfaceRadiationMod , only : FatesSunShadeFracs, FatesNormalizedCanopyRadiation
    use EDBtranMod            , only : btran_ed, &
                                       get_active_suction_layers
    use EDCanopyStructureMod  , only : canopy_summarization, update_hlm_dynamics
@@ -1856,11 +1856,15 @@ contains
 
    subroutine wrap_sunfrac(this,bounds_clump,top_af_inst,canopystate_inst)
 
-      ! ---------------------------------------------------------------------------------
-      ! This interface function is a wrapper call on ED_SunShadeFracs. The only
-      ! returned variable is a patch vector, fsun_patch, which describes the fraction
-      ! of the canopy that is exposed to sun.
-      ! ---------------------------------------------------------------------------------
+     ! ---------------------------------------------------------------------------------
+     ! This interface function is a wrapper call on ED_SunShadeFracs. The only
+     ! returned variable is a patch vector, fsun_patch, which describes the fraction
+     ! of the canopy that is exposed to sun. This was already calculated during
+     ! FatesNormalizedCanopyRadiation, but its still relevant.
+     ! We also pass in the downwelling beam and diffuse radiation at the canopy top.
+     ! This is used to scale the normalized scattering and absorption profiles
+     ! inside the canopy
+     ! ---------------------------------------------------------------------------------
 
       implicit none
 
@@ -1917,7 +1921,7 @@ contains
         ! as well as total patch sun/shade fraction output boundary condition
         ! -------------------------------------------------------------------------------
 
-        call ED_SunShadeFracs(this%fates(nc)%nsites, &
+        call FatesSunShadeFracs(this%fates(nc)%nsites, &
              this%fates(nc)%sites,  &
              this%fates(nc)%bc_in,  &
              this%fates(nc)%bc_out)
@@ -2370,7 +2374,7 @@ contains
  ! ======================================================================================
  
  subroutine wrap_canopy_radiation(this, bounds_clump, &
-         num_vegsol, filter_vegsol, coszen, surfalb_inst)
+         num_vegsol, filter_vegsol, coszen, surfalb_inst, top_af_inst)
 
 
     ! Arguments
@@ -2382,9 +2386,10 @@ contains
     ! cosine solar zenith angle for next time step
     real(r8)           , intent(in)            :: coszen( bounds_clump%begp: )
     type(surfalb_type) , intent(inout)         :: surfalb_inst
-
+    type(topounit_atmospheric_flux),  intent(in)   :: top_af_inst
+    
     ! locals
-    integer                                    :: s,c,p,ifp,icp,nc
+    integer                                    :: s,c,p,ifp,icp,nc,t
 
     associate(&
          albgrd_col   =>    surfalb_inst%albgrd_col         , & !in
@@ -2395,13 +2400,15 @@ contains
          fabi         =>    surfalb_inst%fabi_patch         , & !out
          ftdd         =>    surfalb_inst%ftdd_patch         , & !out
          ftid         =>    surfalb_inst%ftid_patch         , & !out
-         ftii         =>    surfalb_inst%ftii_patch)            !out
-
+         ftii         =>    surfalb_inst%ftii_patch         , & !out
+         forc_solad   =>    top_af_inst%solad, &
+         forc_solai   =>    top_af_inst%solai)
+      
     nc = bounds_clump%clump_index
 
     do s = 1, this%fates(nc)%nsites
-
        c = this%f2hmap(nc)%fcolumn(s)
+       t = col_pp%topounit(c)
        do ifp = 1, this%fates(nc)%sites(s)%youngest_patch%patchno
 
           p = ifp+col_pp%pfti(c)
@@ -2428,7 +2435,7 @@ contains
        end do
     end do
 
-    call ED_Norman_Radiation(this%fates(nc)%nsites,  &
+    call FatesNormalizedCanopyRadiation(this%fates(nc)%nsites,  &
          this%fates(nc)%sites, &
          this%fates(nc)%bc_in,  &
          this%fates(nc)%bc_out)
