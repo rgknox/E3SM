@@ -637,7 +637,7 @@ contains
           write(iulog,*)'WARNING:: BalanceCheck, solar radiation balance error (W/m2)'
           write(iulog,*)'nstep         = ',nstep
           write(iulog,*)'errsol        = ',errsol(indexp)
-          !!if (abs(errsol(indexp)) > 1.e-5_r8 ) then
+          if (abs(errsol(indexp)) > 1.e-5_r8 ) then
              write(iulog,*)'elm model is stopping - error is greater than 1e-5 (W/m2)'
              write(iulog,*)'fsa           = ',fsa(indexp)
              write(iulog,*)'fsr           = ',fsr(indexp)
@@ -657,7 +657,7 @@ contains
              ! fsa(p) + fsr(p)
              ! fsa(p)  = cad(p,ib) + cai(p,ib) + trd(p,ib)*(1._r8-albsod(c,ib)) + tri(p,ib)*(1._r8-albsoi(c,ib))
              call endrun(decomp_index=indexp, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
-          !!end if
+          end if
 #endif
        end if
 
