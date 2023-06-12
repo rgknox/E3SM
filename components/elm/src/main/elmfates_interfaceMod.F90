@@ -1696,15 +1696,16 @@ contains
 
    !=====================================================================================
 
-   subroutine init_coldstart(this, canopystate_inst, soilstate_inst, frictionvel_inst)
+   subroutine init_coldstart(this, canopystate_inst, soilstate_inst, frictionvel_inst, surfalb_inst)
 
 
      ! Arguments
      class(hlm_fates_interface_type), intent(inout) :: this
      type(canopystate_type)         , intent(inout) :: canopystate_inst
      type(soilstate_type)           , intent(inout) :: soilstate_inst
-     type(frictionvel_type)  , intent(inout)        :: frictionvel_inst
-
+     type(frictionvel_type)         , intent(inout) :: frictionvel_inst
+     type(surfalb_type)             , intent(inout) :: surfalb_inst
+     
      ! locals
      integer                                        :: nclumps
      integer                                        :: nc
@@ -1829,6 +1830,34 @@ contains
            call this%wrap_update_hlmfates_dyn(nc,bounds_clump, &
                 canopystate_inst,frictionvel_inst, .false.)
 
+           do s = 1,this%fates(nc)%nsites
+              c = this%f2hmap(nc)%fcolumn(s)
+
+              ! Because the canopy radiation solution (normalized)
+              ! is called at the end of the driver sequence for each
+              ! timestep, when the first timestep is initiated
+              ! on a cold-start, there will be no solution prepared.
+              ! Even if it day-time, we simply elect to set the
+              ! zenith flag to night-time, and give some arbitrary
+              ! starter values for snow and soil albedo. This is
+              ! only 1 timestep, 30 minutes.
+
+              this%fates(nc)%bc_in(s)%filter_vegzen_pa(:) = .false.
+              this%fates(nc)%bc_in(s)%coszen_pa(:) = 0.0_r8
+              this%fates(nc)%bc_in(s)%albgr_dif_rb(:) = 0.3_r8
+              this%fates(nc)%bc_in(s)%albgr_dir_rb(:) = 0.3_r8
+              this%fates(nc)%bc_in(s)%fcansno_pa(:)   = 0._r8
+           end do
+
+           !call FatesNormalizedCanopyRadiation(this%fates(nc)%nsites, &
+           !     this%fates(nc)%sites, &
+           !     this%fates(nc)%bc_in, &
+           !     this%fates(nc)%bc_out)
+           
+           !call this%fates_restart%update_3dpatch_radiation(this%fates(nc)%nsites, &
+           !                                                 this%fates(nc)%sites, &
+           !                                                 this%fates(nc)%bc_out)
+           
            ! ------------------------------------------------------------------------
            ! Update history IO fields that depend on ecosystem dynamics
            ! ------------------------------------------------------------------------
@@ -1854,7 +1883,7 @@ contains
 
    ! ======================================================================================
 
-   subroutine wrap_sunfrac(this,bounds_clump,top_af_inst,canopystate_inst)
+   subroutine wrap_sunfrac(this,bounds_clump,top_af_inst,canopystate_inst,cold_init)
 
       ! ---------------------------------------------------------------------------------
       ! This interface function is a wrapper call on ED_SunShadeFracs. The only
@@ -1873,6 +1902,8 @@ contains
 
       ! Input/Output Arguments to CLM
       type(canopystate_type),intent(inout) :: canopystate_inst
+
+      logical, intent(in) :: cold_init  ! True if this is a cold-start timestep
 
       ! Local Variables
       integer  :: p                           ! global index of the host patch
@@ -1920,7 +1951,8 @@ contains
         call FatesSunShadeFracs(this%fates(nc)%nsites, &
              this%fates(nc)%sites,  &
              this%fates(nc)%bc_in,  &
-             this%fates(nc)%bc_out)
+             this%fates(nc)%bc_out, &
+             cold_init)
 
         ! -------------------------------------------------------------------------------
         ! Transfer the FATES output boundary condition for canopy sun/shade fraction
@@ -2493,13 +2525,24 @@ contains
          this%fates(nc)%bc_in(s)%tot_litc     = totlitc(c)
       end do
 
-      ! Update history variables that track these variables
-      call fates_hist%update_history_hifrq(nc, &
+      ! Update history variables that track these high frequency variables
+      call fates_hist%update_history_hifrq_simple(nc, &
            this%fates(nc)%nsites,  &
            this%fates(nc)%sites,   &
            this%fates(nc)%bc_in,   &
+           this%fates(nc)%bc_out,  & 
            dtime)
-
+      
+      ! Update history variables that track these multi-dimensioned
+      ! high frequency variables
+      call fates_hist%update_history_hifrq_multi(nc, &
+           this%fates(nc)%nsites,  &
+           this%fates(nc)%sites,   &
+           this%fates(nc)%bc_in,   &
+           this%fates(nc)%bc_out,  & 
+           dtime)
+      
+      
 
     end associate
 end subroutine wrap_update_hifrq_hist
