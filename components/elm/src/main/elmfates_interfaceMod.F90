@@ -1883,7 +1883,7 @@ contains
 
    ! ======================================================================================
 
-   subroutine wrap_sunfrac(this,bounds_clump,top_af_inst,canopystate_inst,cold_init)
+   subroutine wrap_sunfrac(this,bounds_clump,top_af_inst,canopystate_inst)
 
       ! ---------------------------------------------------------------------------------
       ! This interface function is a wrapper call on ED_SunShadeFracs. The only
@@ -1902,8 +1902,6 @@ contains
 
       ! Input/Output Arguments to CLM
       type(canopystate_type),intent(inout) :: canopystate_inst
-
-      logical, intent(in) :: cold_init  ! True if this is a cold-start timestep
 
       ! Local Variables
       integer  :: p                           ! global index of the host patch
@@ -1951,8 +1949,7 @@ contains
         call FatesSunShadeFracs(this%fates(nc)%nsites, &
              this%fates(nc)%sites,  &
              this%fates(nc)%bc_in,  &
-             this%fates(nc)%bc_out, &
-             cold_init)
+             this%fates(nc)%bc_out)
 
         ! -------------------------------------------------------------------------------
         ! Transfer the FATES output boundary condition for canopy sun/shade fraction
