@@ -1696,7 +1696,7 @@ contains
 
    !=====================================================================================
 
-   subroutine init_coldstart(this, canopystate_inst, soilstate_inst, frictionvel_inst, surfalb_inst)
+   subroutine init_coldstart(this, canopystate_inst, soilstate_inst, frictionvel_inst )
 
 
      ! Arguments
@@ -1704,7 +1704,6 @@ contains
      type(canopystate_type)         , intent(inout) :: canopystate_inst
      type(soilstate_type)           , intent(inout) :: soilstate_inst
      type(frictionvel_type)         , intent(inout) :: frictionvel_inst
-     type(surfalb_type)             , intent(inout) :: surfalb_inst
      
      ! locals
      integer                                        :: nclumps
