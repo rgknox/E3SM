@@ -56,6 +56,7 @@ _TESTS = {
         "tests" : (
             "ERS_Ld20.f45_f45.IELMFATES.elm-fates",
             "ERS.hcru_hcru.I20TRGSWCNPRDCTCBC.elm-erosion",
+            "ERS.f09_g16.IELMBC.elm-simple_decomp",
             )
         },
 
@@ -220,23 +221,24 @@ _TESTS = {
     "e3sm_atm_nbfb" : {
         "tests" : (
             "PGN_P1x1.ne4_oQU240.F2010",
-            "TSC.ne4_oQU240.F2010-CICE",
+            "TSC.ne4_oQU240.F2010",
             "MVK_PS.ne4_oQU240.F2010",
             )
         },
 
     "e3sm_ocnice_stealth_features" : {
         "tests" : (
-            "SMS_D_Ld1.T62_oQU240wLI.GMPAS-IAF-ISMF.mpaso-impl_top_drag",
+            "SMS_D_Ld1.T62_oQU240wLI.GMPAS-IAF-PISMF.mpaso-impl_top_drag",
             "SMS_D_Ld1.T62_oQU240.GMPAS-IAF.mpaso-harmonic_mean_drag",
+            "SMS_D_Ld1.T62_oQU240.GMPAS-IAF.mpaso-upwind_advection",
             )
         },
 
     "e3sm_ocnice_extra_coverage" : {
         "inherit" : ("e3sm_ocnice_stealth_features"),
         "tests" : (
-            "ERS_P480_Ld5.T62_ECwISC30to60E2r1.GMPAS-DIB-IAF-ISMF",
-            "PEM_P480_Ld5.T62_ECwISC30to60E2r1.GMPAS-DIB-IAF-ISMF",
+            "ERS_P480_Ld5.T62_ECwISC30to60E2r1.GMPAS-DIB-IAF-PISMF",
+            "PEM_P480_Ld5.T62_ECwISC30to60E2r1.GMPAS-DIB-IAF-PISMF",
             "SMS.ne30_oECv3_gis.IGELM_MLI.elm-extrasnowlayers",
             )
         },
@@ -265,6 +267,7 @@ _TESTS = {
             "NCK.f19_g16_rx1.A",
             "SMS.ne30_f19_g16_rx1.A",
             "ERS_Ld5.T62_oQU120.CMPASO-NYF",
+            "SMS_Ld1.T62_oQU240wLI.GMPAS-IAF-DISMF",
             "ERS.f09_g16_g.MALISIA",
             "SMS.T62_oQU120_ais20.MPAS_LISIO_TEST",
             "SMS.f09_g16_a.IGELM_MLI",
@@ -302,6 +305,7 @@ _TESTS = {
             "SMS_D_Ld3.T62_oQU120.CMPASO-IAF",
             "SMS_D_Ld1.ne30pg2_r05_EC30to60E2r2.WCYCL1850",
             "SMS_Ln5.ne30pg2_ne30pg2.F2010-SCREAM-LR-DYAMOND2",
+            "ERS_Ld3.ne30pg2_r05_EC30to60E2r2.WCYCL1850.allactive-nlmaps",
             )
         },
 
@@ -335,6 +339,7 @@ _TESTS = {
             "ERP_Ln9.ne4pg2_oQU480.WCYCL20TRNS-MMF1.allactive-mmf_fixed_subcycle",
             "ERS_Ln9.ne4pg2_ne4pg2.FRCE-MMF1.eam-cosp_nhtfrq9",
             "SMS_Ln5.ne4_ne4.FSCM-ARM97-MMF1",
+            "SMS_Ln3.ne4pg2_ne4pg2.F2010-MMF2",
             )
         },
 
@@ -420,6 +425,7 @@ _TESTS = {
                  "SMS.ne4_oQU240.F2010.eam-thetahy_ftype0",
                  "SMS.ne4_oQU240.F2010.eam-thetahy_ftype1",
                  "SMS.ne4_oQU240.F2010.eam-thetahy_ftype2",
+                 "SMS.ne4_oQU240.F2010.eam-thetahy_ftype2_energy",
                  "SMS.ne4_oQU240.F2010.eam-thetahy_ftype4",
                  "SMS.ne4_oQU240.F2010.eam-thetanh_ftype0",
                  "SMS.ne4_oQU240.F2010.eam-thetanh_ftype1",
@@ -774,8 +780,178 @@ _TESTS = {
                      "e3sm_superbfb_ice_dbg_thrd", "e3sm_superbfb_ice_opt_thrd"),
     },
 
+    # super-BFB LND
+    "e3sm_superbfb_lnd_opt" : { # opt + pureMPI
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "ERS_Lh3.ne30pg2_ne30pg2.IELMTEST.pemod-omp1",
+            "PEM_Lh3.ne30pg2_ne30pg2.IELMTEST.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_lnd_dbg" : { # dbg + pureMPI
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "ERS_Lh3_D.ne30pg2_ne30pg2.IELMTEST.pemod-omp1",
+            "PEM_Lh3_D.ne30pg2_ne30pg2.IELMTEST.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_lnd_opt_thrd" : { # opt + threads
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "PET_Lh3.ne30pg2_ne30pg2.IELMTEST.pemod-omp2",
+            "ERS_Lh3.ne30pg2_ne30pg2.IELMTEST.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_lnd_dbg_thrd" : { # dbg + threads
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "PET_Lh3_D.ne30pg2_ne30pg2.IELMTEST.pemod-omp2",
+            "ERS_Lh3_D.ne30pg2_ne30pg2.IELMTEST.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_lnd" : {
+        "inherit" : ("e3sm_superbfb_lnd_dbg", "e3sm_superbfb_lnd_opt",
+                     "e3sm_superbfb_lnd_dbg_thrd", "e3sm_superbfb_lnd_opt_thrd"),
+    },
+
+    # super-BFB ROF
+    "e3sm_superbfb_rof_opt" : { # opt + pureMPI
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "ERS_Ld3.r05_r05.RMOSGPCC.pemod-omp1",
+            "PEM_Ld3.r05_r05.RMOSGPCC.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_rof_dbg" : { # dbg + pureMPI
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "ERS_Ld3_D.r05_r05.RMOSGPCC.pemod-omp1",
+            "PEM_Ld3_D.r05_r05.RMOSGPCC.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_rof_opt_thrd" : { # opt + threads
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "PET_Ld3.r05_r05.RMOSGPCC.pemod-omp2",
+            "ERS_Ld3.r05_r05.RMOSGPCC.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_rof_dbg_thrd" : { # dbg + threads
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "PET_Ld3_D.r05_r05.RMOSGPCC.pemod-omp2",
+            "ERS_Ld3_D.r05_r05.RMOSGPCC.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_rof" : {
+        "inherit" : ("e3sm_superbfb_rof_dbg", "e3sm_superbfb_rof_opt",
+                     "e3sm_superbfb_rof_dbg_thrd", "e3sm_superbfb_rof_opt_thrd"),
+    },
+
+    # super-BFB ATM
+    "e3sm_superbfb_atm_opt" : { # opt + pureMPI
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "ERS_Lh3.ne30pg2_ne30pg2.FAQP.pemod-omp1",
+            "PEM_Lh3.ne30pg2_ne30pg2.FAQP.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_atm_dbg" : { # dbg + pureMPI
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "ERS_Lh3_D.ne30pg2_ne30pg2.FAQP.pemod-omp1",
+            "PEM_Lh3_D.ne30pg2_ne30pg2.FAQP.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_atm_opt_thrd" : { # opt + threads
+        #"share"   : True,
+        "time"    : "00:30:00",
+        "tests"   : (
+            "PET_Lh3.ne30pg2_ne30pg2.FAQP.pemod-omp2",
+            "ERS_Lh3.ne30pg2_ne30pg2.FAQP.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_atm_dbg_thrd" : { # dbg + threads
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "PET_Lh3_D.ne30pg2_ne30pg2.FAQP.pemod-omp2",
+            "ERS_Lh3_D.ne30pg2_ne30pg2.FAQP.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_atm" : {
+        "inherit" : ("e3sm_superbfb_atm_dbg", "e3sm_superbfb_atm_opt",
+                     "e3sm_superbfb_atm_dbg_thrd", "e3sm_superbfb_atm_opt_thrd"),
+    },
+
+    # super-BFB all-active
+    "e3sm_superbfb_wcycl_opt" : { # opt + pureMPI
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "ERS_Ld3.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp1",
+            "PEM_Ld3.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_wcycl_dbg" : { # dbg + pureMPI
+        #"share"   : True,
+        "time"    : "02:00:00",
+        "tests"   : (
+            "ERS_Ld3_D.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp1",
+            "PEM_Ld3_D.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp1",
+        )
+    },
+
+    "e3sm_superbfb_wcycl_opt_thrd" : { # opt + threads
+        #"share"   : True,
+        "time"    : "01:00:00",
+        "tests"   : (
+            "PET_Ld3.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp2",
+            "ERS_Ld3.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-ompfull",
+        )
+    },
+
+    "e3sm_superbfb_wcycl_dbg_thrd" : { # dbg + threads
+        #"share"   : True,
+        "time"    : "02:00:00",
+        "tests"   : (
+            "PET_Ld3_D.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp2",
+            "ERS_Ld3_D.ne30pg2_EC30to60E2r2.WCYCL1850.pemod-omp2",
+        )
+    },
+
+    "e3sm_superbfb_wcycl" : {
+        "inherit" : ("e3sm_superbfb_wcycl_dbg", "e3sm_superbfb_wcycl_opt",
+                     "e3sm_superbfb_wcycl_dbg_thrd", "e3sm_superbfb_wcycl_opt_thrd"),
+    },
+
     "e3sm_superbfb" : {
-        "inherit" : ("e3sm_superbfb_ocn", "e3sm_superbfb_ice"),
+        "inherit" : ("e3sm_superbfb_ocn", "e3sm_superbfb_ice",
+                     "e3sm_superbfb_lnd", "e3sm_superbfb_rof",
+                     "e3sm_superbfb_atm", "e3sm_superbfb_wcycl"),
     },
 }
 

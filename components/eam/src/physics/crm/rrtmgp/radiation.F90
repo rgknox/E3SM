@@ -16,7 +16,7 @@ module radiation
    use shr_kind_mod,     only: r8=>shr_kind_r8, cl=>shr_kind_cl
    use ppgrid,           only: pcols, pver, pverp, begchunk, endchunk
    use cam_abortutils,   only: endrun
-   use scamMod,          only: scm_crm_mode, single_column
+   use iop_data_mod,     only: single_column
    use rad_constituents, only: N_DIAG
    use radconstants,     only: &
       nswbands, nlwbands, &
@@ -738,13 +738,6 @@ contains
                   'Cosine of solar zenith angle', &
                   sampling_seq='rad_lwsw', flag_xyfill=.true.)
 
-      if (single_column .and. scm_crm_mode) then
-         call add_default ('FUS     ', 1, ' ')
-         call add_default ('FUSC    ', 1, ' ')
-         call add_default ('FDS     ', 1, ' ')
-         call add_default ('FDSC    ', 1, ' ')
-      end if
-
       ! Longwave radiation
       do icall = 0,N_DIAG
          if (active_calls(icall)) then
@@ -842,14 +835,6 @@ contains
                   sampling_seq='rad_lwsw', flag_xyfill=.true.)
 
       call addfld('EMIS', (/ 'lev' /), 'A', '1', 'Cloud longwave emissivity')
-
-      ! Add default fields for single column mode
-      if (single_column.and.scm_crm_mode) then
-         call add_default ('FUL     ', 1, ' ')
-         call add_default ('FULC    ', 1, ' ')
-         call add_default ('FDL     ', 1, ' ')
-         call add_default ('FDLC    ', 1, ' ')
-      endif
 
       ! HIRS/MSU diagnostic brightness temperatures
       if (dohirs) then
@@ -2638,7 +2623,6 @@ contains
       use cam_abortutils, only: endrun
       real(r8), pointer :: pbuf(:)
       integer :: err, idx
-      logical :: use_MMF
       character(len=16) :: MMF_microphysics_scheme
 
       idx = pbuf_get_index('CLDFSNOW', errcode=err)
@@ -2649,9 +2633,11 @@ contains
       end if
 
       ! Reset to false if using MMF with 1-mom scheme
-      call phys_getopts(use_MMF_out           = use_MMF          )
       call phys_getopts(MMF_microphysics_scheme_out = MMF_microphysics_scheme)
-      if (use_MMF .and. (trim(MMF_microphysics_scheme) == 'sam1mom')) then
+      if (trim(MMF_microphysics_scheme) == 'sam1mom') then
+         do_snow_optics = .false.
+      end if
+      if (trim(MMF_microphysics_scheme) == 'p3') then
          do_snow_optics = .false.
       end if
 

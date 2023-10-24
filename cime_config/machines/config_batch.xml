@@ -366,7 +366,6 @@
     <submit_args>
       <arg flag="--time" name="$JOB_WALLCLOCK_TIME"/>
       <arg flag="-p" name="$JOB_QUEUE"/>
-      <arg flag="--account" name="$PROJECT"/>
     </submit_args>
     <directives>
       <directive> --job-name={{ job_id }}</directive>
@@ -464,6 +463,7 @@
       <directive> --constraint=cpu</directive>
     </directives>
     <queues>
+      <!-- Note: walltime is not the max walltime, but the default - see NERSC docs for Q limits, https://docs.nersc.gov/jobs/policy/ -->
       <queue walltimemax="00:30:00" nodemax="4096" default="true">regular</queue>
       <queue walltimemax="00:30:00" nodemax="4096" strict="true">preempt</queue>
       <queue walltimemax="00:30:00" nodemax="8" strict="true">debug</queue>
