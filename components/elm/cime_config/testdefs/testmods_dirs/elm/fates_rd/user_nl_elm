@@ -2,6 +2,7 @@ use_cn            = .false.
 finidat           = ''
 hist_mfilt        = 365
 hist_nhtfrq       = -24
+hist_ndens = 1
 fates_parteh_mode = 2
 use_lch4          = .true.
 fates_spitfire_mode = 1
