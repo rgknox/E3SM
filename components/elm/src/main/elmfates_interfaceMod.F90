@@ -1851,34 +1851,6 @@ contains
            call this%wrap_update_hlmfates_dyn(nc,bounds_clump, &
                 canopystate_inst,frictionvel_inst, .false.)
 
-           do s = 1,this%fates(nc)%nsites
-              c = this%f2hmap(nc)%fcolumn(s)
-
-              ! Because the canopy radiation solution (normalized)
-              ! is called at the end of the driver sequence for each
-              ! timestep, when the first timestep is initiated
-              ! on a cold-start, there will be no solution prepared.
-              ! Even if it day-time, we simply elect to set the
-              ! zenith flag to night-time, and give some arbitrary
-              ! starter values for snow and soil albedo. This is
-              ! only 1 timestep, 30 minutes.
-
-              this%fates(nc)%bc_in(s)%filter_vegzen_pa(:) = .false.
-              this%fates(nc)%bc_in(s)%coszen_pa(:) = 0.0_r8
-              this%fates(nc)%bc_in(s)%albgr_dif_rb(:) = 0.3_r8
-              this%fates(nc)%bc_in(s)%albgr_dir_rb(:) = 0.3_r8
-              this%fates(nc)%bc_in(s)%fcansno_pa(:)   = 0._r8
-           end do
-
-           !call FatesNormalizedCanopyRadiation(this%fates(nc)%nsites, &
-           !     this%fates(nc)%sites, &
-           !     this%fates(nc)%bc_in, &
-           !     this%fates(nc)%bc_out)
-           
-           !call this%fates_restart%update_3dpatch_radiation(this%fates(nc)%nsites, &
-           !                                                 this%fates(nc)%sites, &
-           !                                                 this%fates(nc)%bc_out)
-           
            ! ------------------------------------------------------------------------
            ! Update history IO fields that depend on ecosystem dynamics
            ! ------------------------------------------------------------------------
