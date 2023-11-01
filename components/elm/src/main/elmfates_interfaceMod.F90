@@ -230,7 +230,9 @@ module ELMFatesInterfaceMod
       procedure, public :: InitAccBuffer ! Initialize any accumulation buffers
       procedure, public :: InitAccVars   ! Initialize any accumulation variables
       procedure, public :: UpdateAccVars ! Update any accumulation variables
-      procedure, public :: UpdateLitterFluxes
+      procedure, public :: UpdateCLitterFluxes
+      procedure, public :: UpdateNLitterFluxes
+      procedure, public :: UpdatePLitterFLuxes
       procedure, private :: init_history_io
       procedure, private :: wrap_update_hlmfates_dyn
       procedure, private :: init_soil_depths
@@ -1093,91 +1095,136 @@ contains
 
 
    ! ====================================================================================
+   
+   subroutine UpdateCLitterFluxes(this,ci,c)
 
-   subroutine UpdateLitterFluxes(this,bounds_clump)
+     implicit none
+     class(hlm_fates_interface_type), intent(inout) :: this
+     integer,intent(in)                             :: ci
+     integer,intent(in)                             :: c
+     
+     ! !LOCAL VARIABLES:
+     integer  :: s                        ! site index
+     
+     integer  :: nld_si
+     real(r8) :: dtime
+     
+     dtime = real(get_step_size(),r8)
+     s = this%f2hmap(ci)%hsites(c)
+     
+     if ( use_fates_sp ) return
 
-      implicit none
-      class(hlm_fates_interface_type), intent(inout) :: this
-      type(bounds_type)              , intent(in)    :: bounds_clump
+     ! THIS IS ONLY CALLED FOR CLitter, so it MUST
+     ! BE CALLED PRIOR TO NLitter and PLitter
+     call FluxIntoLitterPools(this%fates(ci)%sites(s), &
+          this%fates(ci)%bc_in(s), &
+          this%fates(ci)%bc_out(s))
+     
+     col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
+          this%fates(ci)%bc_out(s)%litt_flux_lab_c_si(1:nlevdecomp) * dtime
+     col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
+          this%fates(ci)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp)* dtime
+     col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
+          this%fates(ci)%bc_out(s)%litt_flux_lig_c_si(1:nlevdecomp) * dtime
+     
+     col_cf%litfall(c) = &
+          sum(this%fates(ci)%bc_out(s)%litt_flux_lab_c_si(1:nlevdecomp) * this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+          sum(this%fates(ci)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp) * this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+          sum(this%fates(ci)%bc_out(s)%litt_flux_lig_c_si(1:nlevdecomp) * this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
+     
+   end subroutine UpdateCLitterFluxes
 
-      ! !LOCAL VARIABLES:
-      integer  :: s                        ! site index
-      integer  :: c                        ! column index (HLM)
-      integer  :: nc                       ! clump index
-      integer  :: nld_si
-      real(r8) :: dtime
+   ! ====================================================================================
 
-      dtime = real(get_step_size(),r8)
-      nc = bounds_clump%clump_index
+   subroutine UpdateNLitterFluxes(this,ci,c)
 
-      do s = 1, this%fates(nc)%nsites
-         c = this%f2hmap(nc)%fcolumn(s)
+     implicit none
+     class(hlm_fates_interface_type), intent(inout) :: this
+     integer,intent(in)                             :: ci
+     integer,intent(in)                             :: c
+     
+     ! !LOCAL VARIABLES:
+     integer  :: s                        ! site index
+     integer  :: nld_si
+     real(r8) :: dtime
+     
+     dtime = real(get_step_size(),r8)
+     s = this%f2hmap(ci)%hsites(c)
+     
+     if ( use_fates_sp ) return
 
-         col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
-              col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
-              this%fates(nc)%bc_out(s)%litt_flux_lab_c_si(1:nlevdecomp) * dtime
-         col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
-              col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
-              this%fates(nc)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp)* dtime
-         col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
-              col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
-              this%fates(nc)%bc_out(s)%litt_flux_lig_c_si(1:nlevdecomp) * dtime
+     ! Since N and P are always allocated in ELM, AND, since on the FATES
+     ! side we have prepped these arrays, which may be zero fluxes in the case of
+     ! prescribed FATES nutrient mode, we can send the fluxes into the source pools
+     
+     if (fates_parteh_mode == prt_cnp_flex_allom_hyp ) then
 
-         col_cf%litfall(c) = &
-               sum(this%fates(nc)%bc_out(s)%litt_flux_lab_c_si(1:nlevdecomp) * this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-               sum(this%fates(nc)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp) * this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-               sum(this%fates(nc)%bc_out(s)%litt_flux_lig_c_si(1:nlevdecomp) * this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
+        ! Transfer Nitrogen
+        col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
+             col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_lab_n_si(1:nlevdecomp) * dtime
+        
+        col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
+             col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp)* dtime
+        
+        col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
+             col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_lig_n_si(1:nlevdecomp) * dtime
+        
+        ! Diagnostic for mass balancing  (gN/m2/s)
+        col_nf%plant_to_litter_nflux(c) = &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_lab_n_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_lig_n_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
 
+     end if
+   end subroutine UpdateNLitterFluxes
 
-         ! Since N and P are always allocated in ELM, AND, since on the FATES
-         ! side we have prepped these arrays, which may be zero fluxes in the case of
-         ! prescribed FATES nutrient mode, we can send the fluxes into the source pools
+   subroutine UpdatePLitterFluxes(this,ci,c)
+     
+     implicit none
+     class(hlm_fates_interface_type), intent(inout) :: this
+     integer,intent(in)                             :: ci
+     integer,intent(in)                             :: c
+     
+     ! !LOCAL VARIABLES:
+     integer  :: s                        ! site index
+     integer  :: nld_si
+     real(r8) :: dtime
+     
+     dtime = real(get_step_size(),r8)
+     s = this%f2hmap(ci)%hsites(c)
+     
+     if ( use_fates_sp ) return
 
-         select case(fates_parteh_mode)
-         case (prt_cnp_flex_allom_hyp )
-
-            col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
-                 col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_lab_p_si(1:nlevdecomp) * dtime
-
-            col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
-                 col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_cel_p_si(1:nlevdecomp)* dtime
-
-            col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
-                 col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_lig_p_si(1:nlevdecomp) * dtime
-
-            ! Diagnostic for mass balancing (gP/m2/s)
-            col_pf%plant_to_litter_pflux(c) = &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_lab_p_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_cel_p_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_lig_p_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
-
-            ! Transfer Nitrogen
-            col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
-                 col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_lab_n_si(1:nlevdecomp) * dtime
-
-            col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
-                 col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp)* dtime
-
-            col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
-                 col_nf%decomp_npools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
-                 this%fates(nc)%bc_out(s)%litt_flux_lig_n_si(1:nlevdecomp) * dtime
-
-            ! Diagnostic for mass balancing  (gN/m2/s)
-            col_nf%plant_to_litter_nflux(c) = &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_lab_n_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
-                 sum(this%fates(nc)%bc_out(s)%litt_flux_lig_n_si(1:nlevdecomp)*this%fates(nc)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
-
-         end select
-
-      end do
-
-   end subroutine UpdateLitterFluxes
+     ! Since N and P are always allocated in ELM, AND, since on the FATES
+     ! side we have prepped these arrays, which may be zero fluxes in the case of
+     ! prescribed FATES nutrient mode, we can send the fluxes into the source pools
+     
+     if (fates_parteh_mode == prt_cnp_flex_allom_hyp ) then
+        
+        col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
+             col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_lab_p_si(1:nlevdecomp) * dtime
+        
+        col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
+             col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_cel_p_si(1:nlevdecomp)* dtime
+        
+        col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
+             col_pf%decomp_ppools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
+             this%fates(ci)%bc_out(s)%litt_flux_lig_p_si(1:nlevdecomp) * dtime
+        
+        ! Diagnostic for mass balancing (gP/m2/s)
+        col_pf%plant_to_litter_pflux(c) = &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_lab_p_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_cel_p_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp)) + &
+             sum(this%fates(ci)%bc_out(s)%litt_flux_lig_p_si(1:nlevdecomp)*this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
+        
+     end if
+     
+   end subroutine UpdatePLitterFluxes
 
    !--------------------------------------------------------------------------------------
 
@@ -1618,13 +1665,6 @@ contains
                         this%fates(nc)%bc_in(s), &
                         this%fates(nc)%bc_out(s))
 
-                  ! This call sends internal fates variables into the
-                  ! output boundary condition structures. Note: this is called
-                  ! internally in fates dynamics as well.
-
-                  call FluxIntoLitterPools(this%fates(nc)%sites(s), &
-                       this%fates(nc)%bc_in(s), &
-                       this%fates(nc)%bc_out(s))
                end do
 
                if(use_fates_sp)then
@@ -1836,13 +1876,6 @@ contains
                    this%fates(nc)%bc_in(s), &
                    this%fates(nc)%bc_out(s))
 
-              ! This call sends internal fates variables into the
-              ! output boundary condition structures. Note: this is called
-              ! internally in fates dynamics as well.
-
-              call FluxIntoLitterPools(this%fates(nc)%sites(s), &
-                   this%fates(nc)%bc_in(s), &
-                   this%fates(nc)%bc_out(s))
            end do
 
            ! ------------------------------------------------------------------------

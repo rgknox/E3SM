@@ -15,6 +15,7 @@ module NitrogenStateUpdate1Mod
   use CNStateType            , only : cnstate_type
   use GridcellDataType       , only : grc_ns, grc_nf
   use ColumnDataType         , only : col_ns, col_nf
+  use ColumnType             , only : col_pp
   use VegetationType         , only : veg_pp
   use VegetationDataType     , only : veg_ns, veg_nf
   use tracer_varcon          , only : is_active_betr_bgc
@@ -99,7 +100,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine NitrogenStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
-       cnstate_vars, dt)
+       elm_fates, cnstate_vars, dt)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic nitrogen state
@@ -112,8 +113,9 @@ contains
     integer                  , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                  , intent(in)    :: num_soilp       ! number of soil patches in filter
     integer                  , intent(in)    :: filter_soilp(:) ! filter for soil patches
+    type(hlm_fates_interface_type), intent(inout) :: elm_fates
     type(cnstate_type)       , intent(in)    :: cnstate_vars
-    real(r8)                  , intent(in)    :: dt        ! radiation time step (seconds)
+    real(r8)                  , intent(in)   :: dt        ! radiation time step (seconds)
 
     !
     ! !LOCAL VARIABLES:
@@ -151,21 +153,37 @@ contains
                ! N deposition and fixation (put all into NH4 pool)
                col_ns%smin_nh4_vr(c,j) = col_ns%smin_nh4_vr(c,j) + col_nf%ndep_to_sminn(c)*dt * ndep_prof(c,j)
                col_ns%smin_nh4_vr(c,j) = col_ns%smin_nh4_vr(c,j) + col_nf%nfix_to_sminn(c)*dt * nfixation_prof(c,j)
-
-               ! plant to litter fluxes
-               ! phenology and dynamic landcover fluxes
-               if(.not.use_fates) then
-                  col_nf%decomp_npools_sourcesink(c,j,i_met_lit) = &
-                       col_nf%phenology_n_to_litr_met_n(c,j) * dt
-
-                  col_nf%decomp_npools_sourcesink(c,j,i_cel_lit) = &
-                       col_nf%phenology_n_to_litr_cel_n(c,j) * dt
-
-                  col_nf%decomp_npools_sourcesink(c,j,i_lig_lit) = &
-                       col_nf%phenology_n_to_litr_lig_n(c,j) * dt
-               end if
             end do
          end do
+
+         fc_loop: do fc = 1,num_soilc
+            c = filter_soilc(fc)
+
+            fates_if: if( col_pp%is_fates(c) ) then
+
+               ! If this is a fates column, then we ask fates for the
+               ! litter fluxes, the following routine simply copies
+               ! prepared litter n flux boundary conditions into
+               ! col_cf%decomp_cpools_sourcesink_col
+               
+               call elm_fates%UpdateNLitterfluxes(bounds%clump_index,c)
+               
+            else
+               
+               ! plant to litter fluxes
+               ! phenology and dynamic landcover fluxes
+               do j = 1, nlevdecomp
+                  col_nf%decomp_npools_sourcesink(c,j,i_met_lit) = &
+                       col_nf%phenology_n_to_litr_met_n(c,j) * dt
+                  
+                  col_nf%decomp_npools_sourcesink(c,j,i_cel_lit) = &
+                       col_nf%phenology_n_to_litr_cel_n(c,j) * dt
+                  
+                  col_nf%decomp_npools_sourcesink(c,j,i_lig_lit) = &
+                       col_nf%phenology_n_to_litr_lig_n(c,j) * dt
+               end do
+            end if fates_if
+         end do fc_loop
 
          ! repeating N dep and fixation for crops
          if ( crop_prog )then

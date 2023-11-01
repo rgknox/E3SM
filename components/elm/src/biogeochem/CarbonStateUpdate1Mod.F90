@@ -22,9 +22,11 @@ module CarbonStateUpdate1Mod
   use ColumnDataType          , only : column_carbon_state, column_carbon_flux
   use ColumnDataType          , only : col_cs, c13_col_cs, c14_col_cs
   use ColumnDataType          , only : col_cf, c13_col_cf, c14_col_cf
+  use ColumnType              , only : col_pp
   use VegetationType          , only : veg_pp
   use VegetationDataType      , only : vegetation_carbon_state, vegetation_carbon_flux
   use VegetationPropertiesType, only : veg_vp
+  use ELMFatesInterfaceMod    , only : hlm_fates_interface_type
 
   !
   implicit none
@@ -170,6 +172,7 @@ contains
   subroutine CarbonStateUpdate1(bounds, &
        num_soilc, filter_soilc, &
        num_soilp, filter_soilp, &
+       elm_fates, &
        crop_vars, col_cs, veg_cs, col_cf, veg_cf, dt)
     !
     ! !DESCRIPTION:
@@ -185,6 +188,7 @@ contains
     integer                      , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                      , intent(in)    :: num_soilp       ! number of soil patches in filter
     integer                      , intent(in)    :: filter_soilp(:) ! filter for soil patches
+    type(hlm_fates_interface_type), intent(inout) :: elm_fates
     type(crop_type)              , intent(inout) :: crop_vars
     type(column_carbon_state)    , intent(inout) :: col_cs
     type(vegetation_carbon_state), intent(inout) :: veg_cs
@@ -218,12 +222,23 @@ contains
 
       if (.not. is_active_betr_bgc .and. .not.(use_pflotran .and. pf_cmode) ) then
 
-         ! plant to litter fluxes
-         if(.not.use_fates)then
-            do j = 1,nlevdecomp
-               ! column loop
-               do fc = 1,num_soilc
-                  c = filter_soilc(fc)
+         fc_loop: do fc = 1,num_soilc
+            c = filter_soilc(fc)
+
+            fates_if: if( col_pp%is_fates(c) ) then
+
+               ! If this is a fates column, then we ask fates for the
+               ! litter fluxes, the following routine simply copies
+               ! prepared litter c flux boundary conditions into
+               ! col_cf%decomp_cpools_sourcesink_col
+               
+               call elm_fates%UpdateCLitterfluxes(bounds%clump_index,c)
+               
+            else
+               
+               ! plant to litter fluxes
+               
+               do j = 1,nlevdecomp
                   ! phenology and dynamic land cover fluxes
                   col_cf%decomp_cpools_sourcesink(c,j,i_met_lit) = &
                        col_cf%phenology_c_to_litr_met_c(c,j) * dt
@@ -232,9 +247,9 @@ contains
                   col_cf%decomp_cpools_sourcesink(c,j,i_lig_lit) = &
                        col_cf%phenology_c_to_litr_lig_c(c,j) * dt
                end do
-            end do
-         end if
-
+            end if fates_if
+         end do fc_loop
+         
          ! litter and SOM HR fluxes
          do k = 1, ndecomp_cascade_transitions
             do j = 1,nlevdecomp
