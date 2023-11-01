@@ -29,7 +29,9 @@ module PhosphorusStateUpdate1Mod
   use GridcellDataType       , only : grc_ps, grc_pf
   use ColumnDataType         , only : col_ps, col_pf
   use VegetationDataType     , only : veg_ps, veg_pf
-
+  use ColumnType             , only : col_pp
+  use ELMFatesInterfaceMod   , only : hlm_fates_interface_type
+  
   !
   implicit none
   save
@@ -97,7 +99,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine PhosphorusStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
-       cnstate_vars, dt)
+       elm_fates, cnstate_vars, dt)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic phosphorus state
@@ -109,6 +111,7 @@ contains
     integer                  , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                  , intent(in)    :: num_soilp       ! number of soil patches in filter
     integer                  , intent(in)    :: filter_soilp(:) ! filter for soil patches
+    type(hlm_fates_interface_type), intent(inout) :: elm_fates
     type(cnstate_type)       , intent(in)    :: cnstate_vars
     !
     real(r8)                 , intent(in)    :: dt !radiation time step
@@ -143,11 +146,21 @@ contains
       !------------------------------------------------------------------
       if((.not.is_active_betr_bgc) )then
 
-         if(.not.use_fates)then
-            do j = 1, nlevdecomp
-               do fc = 1,num_soilc
-                  c = filter_soilc(fc)
-                  
+         fc_loop: do fc = 1,num_soilc
+            c = filter_soilc(fc)
+            
+            fates_if: if( col_pp%is_fates(c) ) then
+               
+               ! If this is a fates column, then we ask fates for the
+               ! litter fluxes, the following routine simply copies
+               ! prepared litter c flux boundary conditions into
+               ! col_pf%decomp_cpools_sourcesink_col
+               
+               call elm_fates%UpdatePLitterfluxes(bounds%clump_index,c)
+               
+            else
+               do j = 1, nlevdecomp
+                                 
                   ! plant to litter fluxes
                   ! phenology and dynamic landcover fluxes
                   col_pf%decomp_ppools_sourcesink(c,j,i_met_lit) = &
@@ -160,9 +173,9 @@ contains
                        col_pf%phenology_p_to_litr_lig_p(c,j) * dt
                   
                end do
-            end do
-         end if
-
+            end if fates_if
+         end do fc_loop
+         
       ! decomposition fluxes
       do k = 1, ndecomp_cascade_transitions
          do j = 1, nlevdecomp
