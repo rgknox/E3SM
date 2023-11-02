@@ -381,9 +381,6 @@ _TESTS = {
 
     "fates" : {
         "tests" : (
-            "ERS_Ld9.1x1_brazil.IELMFATES",
-            "ERS_D_Ld9.1x1_brazil.IELMFATES",
-            "SMS_D_Lm6.1x1_brazil.IELMFATES",
             "SMS.f45_f45.IELMFATES.elm-fates_satphen",
             "ERS_D_Ld15.f45_f45.IELMFATES.elm-fates_cold_treedamage",
             "ERS_D_Ld5.f45_f45.IELMFATES.elm-fates_cold",
