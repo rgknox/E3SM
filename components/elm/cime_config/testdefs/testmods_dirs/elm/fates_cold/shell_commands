@@ -1,1 +1,1 @@
-./xmlchange CLM_FORCE_COLDSTART="on"
+./xmlchange ELM_FORCE_COLDSTART="on"
