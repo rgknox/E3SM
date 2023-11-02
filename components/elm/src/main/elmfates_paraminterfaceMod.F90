@@ -3,6 +3,8 @@ module ELMFatesParamInterfaceMod
   ! interface module because of circular dependancies with pftvarcon.
 
   use FatesGlobals, only : fates_log
+  use FatesParametersInterface, only : fates_parameters_type
+  use FatesParametersInterface, only : fates_param_reader_type
   use shr_kind_mod, only : r8 => shr_kind_r8
   
   implicit none
@@ -21,7 +23,6 @@ module ELMFatesParamInterfaceMod
   ! NOTE(bja, 2017-01) these methods can NOT be part of the hlm-fates
   ! interface type because they are called before the instance is
   ! initialized.
-  public :: FatesReadParameters
   public :: FatesReadPFTs
 
   logical :: DEBUG  = .false.
@@ -31,53 +32,6 @@ module ELMFatesParamInterfaceMod
   
 contains
   
- !-----------------------------------------------------------------------
- subroutine FatesReadParameters()
-
-   use elm_varctl, only : use_fates, paramfile, fates_paramfile
-   use spmdMod, only : masterproc
-
-   use FatesParametersInterface, only : fates_parameters_type
-
-   use EDParamsMod, only : FatesRegisterParams, FatesReceiveParams
-   use SFParamsMod, only : SpitFireRegisterParams, SpitFireReceiveParams
-   use PRTInitParamsFATESMod, only : PRTRegisterParams, PRTReceiveParams
-   use FatesSynchronizedParamsMod, only : FatesSynchronizedParamsInst
-
-   implicit none
-
-   character(len=32)  :: subname = 'FatesReadParameters'
-   class(fates_parameters_type), allocatable :: fates_params
-   logical :: is_host_file
-
-   if (use_fates) then
-      if (masterproc) then
-         write(fates_log(), *) 'clmfates_parameterinterfaceMod.F90::'//trim(subname)//' :: CLM reading ED/FATES '//' parameters '
-      end if
-
-      allocate(fates_params)
-      call fates_params%Init()
-      call FatesRegisterParams(fates_params)
-      call SpitFireRegisterParams(fates_params)
-      call PRTRegisterParams(fates_params)
-      call FatesSynchronizedParamsInst%RegisterParams(fates_params)
-
-      is_host_file = .false.
-      call ParametersFromNetCDF(fates_paramfile, is_host_file, fates_params)
-
-      is_host_file = .true.
-      call ParametersFromNetCDF(paramfile, is_host_file, fates_params)
-
-      call FatesReceiveParams(fates_params)
-      call SpitFireReceiveParams(fates_params)
-      call PRTReceiveParams(fates_params)
-      call FatesSynchronizedParamsInst%ReceiveParams(fates_params)
-
-      call fates_params%Destroy()
-      deallocate(fates_params)
-   end if
-
- end subroutine FatesReadParameters
 
  !-----------------------------------------------------------------------
  subroutine FatesReadPFTs()
@@ -85,7 +39,6 @@ contains
    use elm_varctl, only : use_fates, paramfile, fates_paramfile
    use spmdMod, only : masterproc
 
-   use FatesParametersInterface, only : fates_parameters_type
    use EDPftvarcon , only : EDPftvarcon_inst
 
    use fileutils  , only : getfil
