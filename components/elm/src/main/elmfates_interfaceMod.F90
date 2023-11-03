@@ -1121,10 +1121,13 @@ contains
           this%fates(ci)%bc_out(s))
      
      col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_met_lit) = &
+          col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_met_lit) + &
           this%fates(ci)%bc_out(s)%litt_flux_lab_c_si(1:nlevdecomp) * dtime
      col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_cel_lit) = &
+          col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_cel_lit) + &
           this%fates(ci)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp)* dtime
      col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_lig_lit) = &
+          col_cf%decomp_cpools_sourcesink(c,1:nlevdecomp,i_lig_lit) + &
           this%fates(ci)%bc_out(s)%litt_flux_lig_c_si(1:nlevdecomp) * dtime
      
      col_cf%litfall(c) = &
