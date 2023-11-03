@@ -98,7 +98,7 @@ contains
   end subroutine PhosphorusStateUpdateDynPatch
 
   !-----------------------------------------------------------------------
-  subroutine PhosphorusStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
+  subroutine PhosphorusStateUpdate1(bounds,num_soilc, filter_soilc, num_soilp, filter_soilp, &
        elm_fates, cnstate_vars, dt)
     !
     ! !DESCRIPTION:
@@ -107,6 +107,10 @@ contains
     !
     ! !ARGUMENTS:
       !$acc routine seq
+    use decompMod           , only : bounds_type
+    ! !ARGUMENTS:
+
+    type(bounds_type)            , intent(in)    :: bounds
     integer                  , intent(in)    :: num_soilc       ! number of soil columns in filter
     integer                  , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                  , intent(in)    :: num_soilp       ! number of soil patches in filter

@@ -34,7 +34,7 @@ module EcosystemDynMod
   use VegetationDataType  , only : veg_ns, veg_nf
   use VegetationDataType  , only : veg_ps, veg_pf
   use ELMFatesInterfaceMod  , only : hlm_fates_interface_type
-  use elm_instMod  , only : elm_fates
+  use elm_instMod  , only : elm_fates => alm_fates
   ! bgc interface & pflotran
   use elm_varctl         , only : use_elm_interface, use_elm_bgc, use_pflotran, pf_cmode, pf_hmode
   use VerticalProfileMod , only : decomp_vertprofiles
@@ -703,10 +703,10 @@ contains
            elm_fates, crop_vars, c14_col_cs, c14_veg_cs, c14_col_cf, c14_veg_cf,dt)
    end if
 
-   call NitrogenStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
+   call NitrogenStateUpdate1(bounds,num_soilc, filter_soilc, num_soilp, filter_soilp, &
         elm_fates, cnstate_vars, dt)
 
-   call PhosphorusStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
+   call PhosphorusStateUpdate1(bounds,num_soilc, filter_soilc, num_soilp, filter_soilp, &
         elm_fates, cnstate_vars, dt)
    
 

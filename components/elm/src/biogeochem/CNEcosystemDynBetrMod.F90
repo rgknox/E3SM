@@ -46,6 +46,7 @@ module CNEcosystemDynBetrMod
   use VegetationDataType        , only : veg_cf, c13_veg_cf, c14_veg_cf
   use VegetationDataType        , only : veg_ns, veg_nf
   use VegetationDataType        , only : veg_ps, veg_pf
+  use ELMFatesInterfaceMod      , only : hlm_fates_interface_type
 
   implicit none
 
@@ -67,7 +68,7 @@ module CNEcosystemDynBetrMod
          canopystate_vars, soilstate_vars, temperature_vars, crop_vars,  &
          photosyns_vars, soilhydrology_vars, energyflux_vars, &
          PlantMicKinetics_vars,                                          &
-         phosphorusflux_vars, phosphorusstate_vars)
+         phosphorusflux_vars, phosphorusstate_vars, elm_fates)
 
     ! Description:
     ! Update vegetation related state variables and
@@ -140,6 +141,9 @@ module CNEcosystemDynBetrMod
     type(PlantMicKinetics_type)      , intent(inout) :: PlantMicKinetics_vars
     type(phosphorusflux_type)        , intent(inout) :: phosphorusflux_vars
     type(phosphorusstate_type)       , intent(inout) :: phosphorusstate_vars
+    type(hlm_fates_interface_type)   , intent(inout) :: elm_fates
+
+    !use ELMFatesInterfaceMod    , only : hlm_fates_interface_type
     
     real(r8) :: dt 
     integer :: c13= 0, c14=1
@@ -333,22 +337,22 @@ module CNEcosystemDynBetrMod
                isotope=c14, isocol_cs=c14_col_cs, isoveg_cs=c14_veg_cs, isocol_cf=c14_col_cf, isoveg_cf=c14_veg_cf)
        end if
 
-       call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, &
+       call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, elm_fates, &
             crop_vars, col_cs, veg_cs, col_cf, veg_cf, dt)
 
        if ( use_c13 ) then
-          call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, &
+          call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, elm_fates, &
                crop_vars, c13_col_cs, c13_veg_cs, c13_col_cf, c13_veg_cf,dt)
        end if
        if ( use_c14 ) then
-          call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, &
+          call CarbonStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, elm_fates, &
                crop_vars, c14_col_cs, c14_veg_cs, c14_col_cf, c14_veg_cf,dt)
        end if
 
        call NStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
             cnstate_vars,nitrogenflux_vars, nitrogenstate_vars)
 
-       call PhosphorusStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
+       call PhosphorusStateUpdate1(bounds,num_soilc, filter_soilc, num_soilp, filter_soilp, elm_fates, &
             cnstate_vars, dt)
 
        call t_stopf('CNUpdate1')

@@ -1009,7 +1009,7 @@ contains
                  canopystate_vars, soilstate_vars, temperature_vars, crop_vars, &
                  photosyns_vars, soilhydrology_vars, energyflux_vars,&
                  PlantMicKinetics_vars,                                         &
-                 phosphorusflux_vars, phosphorusstate_vars)
+                 phosphorusflux_vars, phosphorusstate_vars, alm_fates)
 
            call AnnualUpdate(bounds_clump,            &
                   filter(nc)%num_soilc, filter(nc)%soilc, &
@@ -1275,7 +1275,8 @@ contains
 
        ! Execute FATES dynamics
        if ( use_fates ) then
-          
+
+
           ! FATES has its own running mean functions, such as 24hr
           ! vegetation temperature and exponential moving averages
           ! for leaf photosynthetic acclimation temperature. These

@@ -2352,23 +2352,25 @@ contains
    real(r8)                                       :: dtime
    integer                                        :: nc
 
+
    nc = bounds_clump%clump_index
-    ! Run a check on the filter
-    do icp = 1,fn
-       p = filterp(icp)
-       c = veg_pp%column(p)
-       s = this%f2hmap(nc)%hsites(c)
-       ifp = p-col_pp%pfti(c)
-       if(this%fates(nc)%bc_in(s)%filter_photo_pa(ifp) /= 3)then
-          write(iulog,*) 'Not all patches on the natveg column in the canopys'
-          write(iulog,*) 'filter ran canopy fluxes: s, p, icp, ifp: ',s,p,icp,ifp
-          call endrun(msg=errMsg(sourcefile, __LINE__))
-       end if
-    end do
 
-
+   ! Run a check on the filter
+   do icp = 1,fn
+      p = filterp(icp)
+      c = veg_pp%column(p)
+      s = this%f2hmap(nc)%hsites(c)
+      ifp = p-col_pp%pfti(c)
+      if(this%fates(nc)%bc_in(s)%filter_photo_pa(ifp) /= 3)then
+         write(iulog,*) 'Not all patches on the natveg column in the canopys'
+         write(iulog,*) 'filter ran canopy fluxes: s, p, icp, ifp: ',s,p,icp,ifp
+         call endrun(msg=errMsg(sourcefile, __LINE__))
+      end if
+   end do
+   
+   
     dtime = real(get_step_size(),r8)
-
+    
     call  AccumulateFluxes_ED(this%fates(nc)%nsites,  &
                                this%fates(nc)%sites, &
                                this%fates(nc)%bc_in,  &
@@ -2760,7 +2762,7 @@ end subroutine wrap_update_hifrq_hist
       end do
    end do
 
-   call UpdateFatesRMeansTStep(this%fates(nc)%sites,this%fates(nc)%bc_in)
+   call UpdateFatesRMeansTStep(this%fates(nc)%sites,this%fates(nc)%bc_in,this%fates(nc)%bc_out)
    
   end subroutine WrapUpdateFatesRmean
 

@@ -30,6 +30,8 @@ module NitrogenStateUpdate1Mod
   use decompMod              , only : bounds_type
   use elm_varcon             , only : dzsoi_decomp
   use elm_varctl             , only : use_fates
+  use ELMFatesInterfaceMod   , only : hlm_fates_interface_type
+  
   !
   implicit none
   save
@@ -99,7 +101,7 @@ contains
   end subroutine NitrogenStateUpdateDynPatch
 
   !-----------------------------------------------------------------------
-  subroutine NitrogenStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
+  subroutine NitrogenStateUpdate1(bounds, num_soilc, filter_soilc, num_soilp, filter_soilp, &
        elm_fates, cnstate_vars, dt)
     !
     ! !DESCRIPTION:
@@ -108,7 +110,10 @@ contains
     !
       !$acc routine seq
     use tracer_varcon, only : is_active_betr_bgc
+    use decompMod           , only : bounds_type
     ! !ARGUMENTS:
+
+    type(bounds_type)            , intent(in)    :: bounds
     integer                  , intent(in)    :: num_soilc       ! number of soil columns in filter
     integer                  , intent(in)    :: filter_soilc(:) ! filter for soil columns
     integer                  , intent(in)    :: num_soilp       ! number of soil patches in filter

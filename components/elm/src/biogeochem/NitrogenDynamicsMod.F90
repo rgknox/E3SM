@@ -207,7 +207,7 @@ contains
                c = filter_soilc(fc)
                s = alm_fates%f2hmap(ic)%hsites(c)
                if ( alm_fates%fates(ic)%bc_out(s)%ema_npp > 0._r8) then
-                  ! ema_npp is units: [gC/m^2/year] 
+                  ! ema_npp is units: [gC/m^2/year]
                   t = test_mult*(1.8_r8 * (1._r8 - exp(-0.003_r8 * alm_fates%fates(ic)%bc_out(s)%ema_npp )))/(secspday * dayspyr)
                   nfix_to_sminn(c) = max(0._r8,t)
                else
