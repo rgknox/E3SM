@@ -379,7 +379,18 @@ _TESTS = {
             )
         },
 
+    "fates-long-tests" : {
+        "time"    : "00:40:00",
+        "tests"   : (
+            "SMS_Lm6.f45_g37.IELMFATES.elm-fates",
+            "SMS_D_Lm6_P144x1.f45_g37.IELMFATES.elm-fates_cold",
+            "ERS_D_Lm13.f45_g37.IELMFATES.elm-fates_cold_nocomp",
+            "ERS_P144x1_Lm25.f10_f10.IELMFATES.elm-fates",
+            )
+        },
+
     "fates" : {
+        "inherit" : ("fates-long-tests"),
         "tests" : (
             "ERP_Ld3.f09_g16.IELMFATES.elm-fates_cold",
             "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
@@ -395,16 +406,13 @@ _TESTS = {
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_pphys",
             "SMS_Ld5_PS.f19_g16.IELMFATES.elm-fates_cold",
             "SMS.f45_g37.IELMFATES.elm-fates_satphen",
-            "SMS_Lm6.f45_g37.IELMFATES.elm-fates",
             "ERP_D_Ld3.f19_g16.IELMFATES.elm-fates_cold",
             "ERP_D_P36x2_Ld3.f19_g16.IELMFATES.elm-fates_cold",
             "ERS_D_Ld3_PS.f09_g16.IELMFATES.elm-fates_cold",
             "ERS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
             "ERS_D_Ld30.f45_g37.IELMFATES.elm-fates_cold_prt2",
-            "ERS_D_Lm13.f45_g37.IELMFATES.elm-fates_cold_nocomp",
             "SMS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
-            "SMS_D_Lm6_P144x1.f45_g37.IELMFATES.elm-fates_cold",
             )
         },
 
