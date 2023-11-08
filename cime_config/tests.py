@@ -313,7 +313,7 @@ _TESTS = {
     "e3sm_extra_coverage" : {
         "inherit" : ("e3sm_atm_extra_coverage", "e3sm_ocnice_extra_coverage"),
         "tests"   : (
-            "SMS_D_Ln3.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA-WW3",
+            "SMS_D_Ln3.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA1p5-WW3.ww3-jra_1958",
             )
         },
 
@@ -389,9 +389,9 @@ _TESTS = {
     #e3sm v3atm related tests for development
     "e3sm_v3atm_integration" : {
         "tests" : (
-            "ERP_Ld3.ne4pg2_oQU480.F2010-P3",
-            "ERS_Ld3.ne4pg2_oQU480.F20TR-P3",
-            "SMS_Ld1.ne30pg2_EC30to60E2r2.WCYCL1850-P3.allactive-wcprod",
+            "ERP_Ld3.ne4pg2_oQU480.F2010",
+            "ERS_Ld3.ne4pg2_oQU480.F20TR",
+            "SMS_Ld1.ne30pg2_EC30to60E2r2.WCYCL1850.allactive-wcprod",
             )
         },
 
