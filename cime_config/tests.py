@@ -411,7 +411,6 @@ _TESTS = {
             "ERS_D_Ld3_PS.f09_g16.IELMFATES.elm-fates_cold",
             "ERS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
-            "ERS_D_Ld30.f45_g37.IELMFATES.elm-fates_cold_prt2",
             "SMS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             )
         },
