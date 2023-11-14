@@ -70,7 +70,6 @@ _TESTS = {
             "ERS_D.f19_g16.I1850GSWCNPRDCTCBC.elm-ctc_f19_g16_I1850GSWCNPRDCTCBC",
             "ERS_D.f09_f09.IELM.elm-solar_rad",
             "ERS_D.f09_f09.IELM.elm-koch_snowflake",
-            "SMS_Ld20_D.f45_f45.IELMFATES.elm-fates_rd"
             )
         },
 
@@ -78,14 +77,12 @@ _TESTS = {
     "e3sm_land_developer" : {
         "share" : True,
         "time"  : "0:45:00",
-        "inherit" : ("e3sm_mosart_developer", "e3sm_mosart_exenoshare", "e3sm_land_exeshare", "e3sm_land_exenoshare", "e3sm_land_debug"),
+        "inherit" : ("e3sm_mosart_developer", "e3sm_mosart_exenoshare", "e3sm_land_exeshare", "e3sm_land_exenoshare", "e3sm_land_debug", "fates_elm_developer"),
         "tests" : (
             "ERS.f19_f19.I1850ELMCN",
             "ERS.f19_f19.I20TRELMCN",
             "SMS_Ld1.hcru_hcru.I1850CRUELMCN",
             "SMS_Ly2_P1x1.1x1_smallvilleIA.IELMCNCROP.elm-force_netcdf_pio",
-            "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
-            "SMS_Ld30.f45_f45.IELMFATES.elm-fates_satphen",
             "ERS.f19_g16.I1850ELM.elm-betr",
             "ERS.f19_g16.I1850ELM.elm-vst",
             "ERS.f09_g16.I1850ELMCN.elm-bgcinterface",
@@ -379,7 +376,21 @@ _TESTS = {
             )
         },
 
-    "fates-long-tests" : {
+    "fates_elm_debug" : {
+        "tests" : (
+            "SMS_Ld20_D.f45_f45.IELMFATES.elm-fates_rd"
+            )
+    },
+
+    "fates_elm_developer" : {
+        "inherit" : ("fates_elm_debug"),
+        "tests" : (
+            "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
+            "SMS_Ld30.f45_f45.IELMFATES.elm-fates_satphen",
+            )
+    },
+
+    "fates_long_tests" : {
         "time"    : "00:40:00",
         "tests"   : (
             "SMS_Lm6.f45_g37.IELMFATES.elm-fates",
@@ -390,7 +401,7 @@ _TESTS = {
         },
 
     "fates" : {
-        "inherit" : ("fates-long-tests"),
+        "inherit" : ("fates_long_tests, fates_elm_developer"),
         "tests" : (
             "ERP_Ld3.f09_g16.IELMFATES.elm-fates_cold",
             "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
