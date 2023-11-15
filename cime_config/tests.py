@@ -378,7 +378,7 @@ _TESTS = {
 
     "fates_elm_debug" : {
         "tests" : (
-            "SMS_Ld20_D.f45_f45.IELMFATES.elm-fates_rd"
+            "SMS_D_Ld20.f45_f45.IELMFATES.elm-fates_rd"
             "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
             )
     },
@@ -386,18 +386,18 @@ _TESTS = {
     "fates_elm_developer" : {
         "inherit" : ("fates_elm_debug"),
         "tests" : (
-            "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
-            "SMS_Ld30.f45_f45.IELMFATES.elm-fates_satphen",
             "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
+            "ERS_Ld30.f45_f45.IELMFATES.elm-fates_satphen",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_sizeagemort",
+            "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
+            "SMS_Ld5_PS.f19_g16.IELMFATES.elm-fates_cold",
             )
     },
 
     "fates_long_tests" : {
         "time"    : "00:40:00",
         "tests"   : (
-            "SMS_Lm6.f45_g37.IELMFATES.elm-fates",
-            "SMS_D_Lm6_P144x1.f45_g37.IELMFATES.elm-fates_cold",
+            "SMS_D_Lm6.f45_g37.IELMFATES.elm-fates_cold",
             "ERS_D_Lm13.f45_g37.IELMFATES.elm-fates",
             "ERS_Lm25.ne4pg2_ne4pg2.IELMFATES.elm-fates_cold_nocomp",
             )
@@ -407,6 +407,9 @@ _TESTS = {
         "inherit" : ("fates_long_tests, fates_elm_developer"),
         "tests" : (
             "ERP_Ld3.f09_g16.IELMFATES.elm-fates_cold",
+            "ERP_D_Ld3.f19_g16.IELMFATES.elm-fates_cold",
+            "ERS_D_Ld3_PS.f09_g16.IELMFATES.elm-fates_cold",
+            "ERS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_satphen",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_fixedbiogeo",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_nocomp",
@@ -416,11 +419,6 @@ _TESTS = {
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_nofire",
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_st3",
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_pphys",
-            "SMS_Ld5_PS.f19_g16.IELMFATES.elm-fates_cold",
-            "ERP_D_Ld3.f19_g16.IELMFATES.elm-fates_cold",
-            "ERS_D_Ld3_PS.f09_g16.IELMFATES.elm-fates_cold",
-            "ERS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
-            "SMS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             )
         },
 
