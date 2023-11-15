@@ -376,14 +376,18 @@ _TESTS = {
             )
         },
 
+    #fates debug tests included in e3sm land developer test runs
     "fates_elm_debug" : {
+        "share"    : True,
         "tests" : (
-            "SMS_D_Ld20.f45_f45.IELMFATES.elm-fates_rd"
+            "SMS_D_Ld20.f45_f45.IELMFATES.elm-fates_rd",
             "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
             )
-    },
+        },
 
+    #fates non-debug tests included in e3sm land developer test runs
     "fates_elm_developer" : {
+        "share"    : True,
         "inherit" : ("fates_elm_debug"),
         "tests" : (
             "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
@@ -392,9 +396,11 @@ _TESTS = {
             "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
             "SMS_Ld5_PS.f19_g16.IELMFATES.elm-fates_cold",
             )
-    },
+        },
 
+    #fates long duration tests runs
     "fates_long_tests" : {
+        "share"    : True,
         "time"    : "00:40:00",
         "tests"   : (
             "SMS_D_Lm6.f45_g37.IELMFATES.elm-fates_cold",
@@ -403,8 +409,9 @@ _TESTS = {
             )
         },
 
+    #fates testmod coverage
     "fates" : {
-        "inherit" : ("fates_long_tests, fates_elm_developer"),
+        "inherit" : ("fates_long_tests", "fates_elm_developer"),
         "tests" : (
             "ERP_Ld3.f09_g16.IELMFATES.elm-fates_cold",
             "ERP_D_Ld3.f19_g16.IELMFATES.elm-fates_cold",
