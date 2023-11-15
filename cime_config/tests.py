@@ -379,6 +379,7 @@ _TESTS = {
     "fates_elm_debug" : {
         "tests" : (
             "SMS_Ld20_D.f45_f45.IELMFATES.elm-fates_rd"
+            "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
             )
     },
 
@@ -387,6 +388,8 @@ _TESTS = {
         "tests" : (
             "SMS_Ld20.f45_f45.IELMFATES.elm-fates_eca",
             "SMS_Ld30.f45_f45.IELMFATES.elm-fates_satphen",
+            "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
+            "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_sizeagemort",
             )
     },
 
@@ -404,8 +407,6 @@ _TESTS = {
         "inherit" : ("fates_long_tests, fates_elm_developer"),
         "tests" : (
             "ERP_Ld3.f09_g16.IELMFATES.elm-fates_cold",
-            "ERP_Ld9.f45_g37.IELMFATES.elm-fates_cold_allvars",
-            "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_sizeagemort",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_satphen",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_fixedbiogeo",
             "ERS_Ld30.f45_g37.IELMFATES.elm-fates_cold_nocomp",
@@ -416,12 +417,9 @@ _TESTS = {
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_st3",
             "ERS_Ld60.f45_g37.IELMFATES.elm-fates_cold_pphys",
             "SMS_Ld5_PS.f19_g16.IELMFATES.elm-fates_cold",
-            "SMS.f45_g37.IELMFATES.elm-fates_satphen",
             "ERP_D_Ld3.f19_g16.IELMFATES.elm-fates_cold",
-            "ERP_D_P36x2_Ld3.f19_g16.IELMFATES.elm-fates_cold",
             "ERS_D_Ld3_PS.f09_g16.IELMFATES.elm-fates_cold",
             "ERS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
-            "ERS_D_Ld15.f45_g37.IELMFATES.elm-fates_cold_treedamage",
             "SMS_D_Ld5.f45_g37.IELMFATES.elm-fates_cold",
             )
         },
