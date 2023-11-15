@@ -395,8 +395,8 @@ _TESTS = {
         "tests"   : (
             "SMS_Lm6.f45_g37.IELMFATES.elm-fates",
             "SMS_D_Lm6_P144x1.f45_g37.IELMFATES.elm-fates_cold",
-            "ERS_D_Lm13.f45_g37.IELMFATES.elm-fates_cold_nocomp",
-            "ERS_P144x1_Lm25.f10_f10.IELMFATES.elm-fates",
+            "ERS_D_Lm13.f45_g37.IELMFATES.elm-fates",
+            "ERS_Lm25.ne4pg2_ne4pg2.IELMFATES.elm-fates_cold_nocomp",
             )
         },
 
