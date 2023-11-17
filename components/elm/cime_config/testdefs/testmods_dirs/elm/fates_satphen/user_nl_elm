@@ -2,7 +2,6 @@ use_cn            = .false.
 finidat           = ''
 hist_mfilt        = 365
 hist_nhtfrq       = -24
-hist_ndens = 1
 hist_empty_htapes = .true.
 fates_spitfire_mode = 0
 use_fates_fixed_biogeog = .true.
