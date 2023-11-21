@@ -1,0 +1,3 @@
+./xmlchange ELM_BLDNML_OPTS="-no-megan" --append
+./xmlchange BFBFLAG="TRUE"
+./xmlchange ELM_FORCE_COLDSTART="on"

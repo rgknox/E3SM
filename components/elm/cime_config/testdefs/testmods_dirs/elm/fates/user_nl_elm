@@ -1,5 +1,4 @@
 use_cn            = .false. 
-finidat           = ''
 hist_mfilt        = 365
 hist_nhtfrq       = -24
 hist_empty_htapes = .true.
