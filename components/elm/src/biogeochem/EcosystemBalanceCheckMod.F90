@@ -845,6 +845,10 @@ contains
     !
     use GridcellDataType, only : gridcell_carbon_flux
     use ColumnDataType  , only : column_carbon_flux
+
+    use GridcellType           , only : grc_pp
+    use ColumnType             , only : col_pp
+    use LandunitType           , only : lun_pp
     !
     ! !ARGUMENTS:
     type(bounds_type)          , intent(in)    :: bounds
@@ -868,7 +872,7 @@ contains
          col_ctrunc                => col_cs%ctrunc                , & ! Input:  [real(r8) (:) ] (gC/m2) total column truncation carbon sink
          col_cropseedc_deficit     => col_cs%cropseedc_deficit     , & ! Input:  [real(r8) (:) ] (gC/m2) column carbon pool for seeding new growth
          col_gpp                   => col_cf%gpp                   , & ! Input:  [real(r8) (:) ] (gC/m2/s) gross primary production
-         col_er                    => col_cf%er                    , & ! Input:  [real(r8) (:) ] (gC/m2/s) total ecosystem respiration, autotrophic + heterotrophic
+         col_er                    => col_cf%er                    , & ! Input:  [real(r8) (:) ] (gC/m2/s) total ecosystem respiration, au%totrophic + heterotrophic
          col_fire_closs            => col_cf%fire_closs            , & ! Input:  [real(r8) (:) ] (gC/m2/s) total column-level fire C loss
          col_prod1c_loss           => col_cf%prod1c_loss           , & ! Input:  [real(r8) (:) ] (gC/m2/s) crop leafc harvested
          col_prod10c_loss          => col_cf%prod10c_loss          , & ! Input:  [real(r8) (:) ] (gC/m2/s) 10-year wood C harvested
@@ -976,6 +980,10 @@ contains
             write(iulog,*)'endcb               = ', end_totc(g)
             write(iulog,*)'delta store         = ', end_totc(g) - beg_totc(g)
 
+
+            write(iulog,*) 'col_totc: ',col_totc(grc_pp%coli(g):grc_pp%colf(g))
+            write(iulog,*) 'lun_types: ',lun_pp%itype(grc_pp%lndi(g):grc_pp%lndf(g))
+            write(iulog,*) 'is_fates: ',col_pp%is_fates(grc_pp%coli(g):grc_pp%colf(g))
             call endrun(msg=errMsg(__FILE__, __LINE__))
          end if
       end do
