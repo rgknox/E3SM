@@ -811,7 +811,6 @@ sub setup_cmdl_fates_mode {
       my @list  = (  "flandusepftdat",
                      "fluh_timeseries",
                      "fates_harvest_mode",
-                     "fates_history_dimlevel",
                      "fates_inventory_ctrl_filename",
                      "fates_parteh_mode",
                      "fates_seeddisp_cadence",

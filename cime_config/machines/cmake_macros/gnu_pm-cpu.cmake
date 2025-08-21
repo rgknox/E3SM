@@ -5,6 +5,9 @@ endif()
 string(APPEND CMAKE_C_FLAGS_RELEASE " -O2 -g")
 string(APPEND CMAKE_Fortran_FLAGS_RELEASE " -O2 -g")
 
+string(APPEND CMAKE_Fortran_FLAGS " -I/global/homes/r/rgknox/local/FTorch/bld-gnu13.2.1")
+string(APPEND CMAKE_Fortran_FLAGS " -I/global/homes/r/rgknox/local/FTorch/bld-gnu13.2.1/modules")
+
 set(MPICC "cc")
 set(MPICXX "CC")
 set(MPIFC "ftn")
