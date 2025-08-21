@@ -48,13 +48,11 @@ module prep_rof_mod
   public :: prep_rof_init
   public :: prep_rof_mrg
 
-#ifdef HAVE_MOAB
   public :: prep_rof_mrg_moab
   public :: prep_rof_accum_lnd_moab
   public :: prep_rof_accum_atm_moab
   public :: prep_rof_accum_ocn_moab
   public :: prep_rof_accum_avg_moab
-#endif
 
   public :: prep_rof_accum_lnd
   public :: prep_rof_accum_atm
@@ -279,7 +277,6 @@ contains
           call mct_aVect_zero(l2racc_lx(eli))
        end do
        l2racc_lx_cnt = 0
-#ifdef HAVE_MOAB
        ! this l2racc_lm will be over land size ?
        sharedFieldsLndRof=''
        nfields_sh_lr = mct_aVect_nRAttr(l2racc_lx(1))
@@ -304,7 +301,7 @@ contains
        allocate(l2x_lm2(lsize_lm, nfields_sh_lr)) ! this will be obtained from land instance
        l2racc_lm(:,:) = 0.
        l2racc_lm_cnt = 0
-#endif
+
        allocate(l2r_rx(num_inst_rof))
        do eri = 1,num_inst_rof
           call mct_avect_init(l2r_rx(eri), rList=seq_flds_l2x_fluxes_to_rof, lsize=lsize_r)
@@ -325,7 +322,6 @@ contains
                'seq_maps.rc','lnd2rof_fmapname:','lnd2rof_fmaptype:',samegrid_lr, &
                string='mapper_Fl2r initialization', esmf_map=esmf_map_flag, no_match=no_match )
 ! similar to a2r, from below
-#ifdef HAVE_MOAB
           ! Call moab intx only if land and river are init in moab
           if ((mblxid .ge. 0) .and.  (mbrxid .ge. 0)) then
             if (iamroot_CPLID) then
@@ -478,7 +474,7 @@ contains
 
             end if ! if ((mblxid .ge. 0) .and.  (mbrxid .ge. 0))
          endif ! samegrid_lr
-#endif
+
           ! We'll map irrigation specially, so exclude this from the list of l2r fields
           ! that are mapped "normally".
           !
@@ -508,7 +504,7 @@ contains
           call mct_aVect_zero(a2racc_ax(eai))
        end do
        a2racc_ax_cnt = 0
-#ifdef HAVE_MOAB
+
        ! this a2racc_am will be over atm size
        sharedFieldsAtmRof=''
        nfields_sh_ar = mct_aVect_nRAttr(a2racc_ax(1))
@@ -533,7 +529,6 @@ contains
        endif
        a2racc_am(:,:) = 0.
        a2racc_am_cnt = 0
-#endif
 
        allocate(a2r_rx(num_inst_rof))
        do eri = 1,num_inst_rof
@@ -553,7 +548,6 @@ contains
                'seq_maps.rc','atm2rof_fmapname:','atm2rof_fmaptype:',samegrid_ar, &
                string='mapper_Fa2r initialization', esmf_map=esmf_map_flag, no_match=no_match )
 ! similar to a2o, prep_ocn
-#ifdef HAVE_MOAB
           ! Call moab intx only if atm  and river are init in moab
           if ((mbrxid .ge. 0) .and.  (mbaxid .ge. 0)) then
             if (iamroot_CPLID) then
@@ -681,8 +675,6 @@ contains
             end if
 
          end if ! if ((mbrxid .ge. 0) .and.  (mbaxid .ge. 0))
-! endif HAVE_MOAB
-#endif
 
           if (iamroot_CPLID) then
              write(logunit,*) ' '
@@ -691,7 +683,7 @@ contains
           call seq_map_init_rcfile(mapper_Sa2r, atm(1), rof(1), &
                'seq_maps.rc','atm2rof_smapname:','atm2rof_smaptype:',samegrid_ar, &
                string='mapper_Sa2r initialization', esmf_map=esmf_map_flag, no_match=no_match )
-#ifdef HAVE_MOAB
+
           if ((mbaxid .ge. 0) .and.  (mbrxid .ge. 0)) then
             ! now take care of the mapper, use the same one as before
             if (iamroot_CPLID) then
@@ -729,7 +721,6 @@ contains
             mapper_Sa2r%weight_identifier = wgtIdSa2r
             mapper_Sa2r%mbname = 'mapper_Sa2r'
           end if ! if ((mbaxid .ge. 0) .and.  (mbrxid .ge. 0))
-#endif
        endif
 
        call shr_sys_flush(logunit)
@@ -753,7 +744,6 @@ contains
        end do
        o2racc_ox_cnt = 0
 
-#ifdef HAVE_MOAB
        ! this o2racc_om will be over ocn size
        sharedFieldsOcnRof=''
        nfields_sh_or = mct_aVect_nRAttr(o2racc_ox(1))
@@ -779,7 +769,7 @@ contains
       endif
       o2racc_om(:,:) = 0.
       o2racc_om_cnt = 0
-#endif
+
        allocate(o2r_rx(num_inst_rof))
        do eri = 1,num_inst_rof
           call mct_avect_init(o2r_rx(eri), rList=seq_flds_o2x_fields_to_rof, lsize=lsize_r)
@@ -798,7 +788,6 @@ contains
                'seq_maps.rc','ocn2rof_smapname:','ocn2rof_smaptype:',samegrid_ro, &
                string='mapper_So2r initialization', esmf_map=esmf_map_flag, no_match=no_match )
 
-#ifdef HAVE_MOAB
           if ((mboxid .ge. 0) .and.  (mbrxid .ge. 0)) then
             ! now take care of the mapper, use the same one as before
             if (iamroot_CPLID) then
@@ -858,7 +847,6 @@ contains
 
 
           end if ! if ((mboxid .ge. 0) .and.  (mbrxid .ge. 0))
-#endif
        endif
 
        call shr_sys_flush(logunit)
@@ -1150,7 +1138,7 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
 
  !================================================================================================
 
-  subroutine prep_rof_accum_avg_moab()
+  subroutine prep_rof_accum_avg_moab(ocn_c2_rof)
 
     !---------------------------------------------------------------
     ! Description
@@ -1158,17 +1146,20 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
     use iMOAB, only : iMOAB_SetDoubleTagStorage, iMOAB_WriteMesh
     use seq_comm_mct, only : num_moab_exports ! for debug
     ! Arguments
+    logical,intent(in) :: ocn_c2_rof
     !
     ! Local Variables
     character(CXX) ::tagname
     integer :: arrsize, ent_type, ierr
+    real(R8) :: ravg  ! averaging factor for bit-for-bit consistency with MCT
 #ifdef MOABDEBUG
     character*32             :: outfile, wopts, lnum
 #endif
     character(*), parameter :: subname = '(prep_rof_accum_avg_moab)'
     !---------------------------------------------------------------
     if(l2racc_lm_cnt > 1) then
-       l2racc_lm = 1./l2racc_lm_cnt*l2racc_lm
+       ravg = 1.0_R8/real(l2racc_lm_cnt, R8)
+       l2racc_lm = l2racc_lm * ravg
     endif
     l2racc_lm_cnt = 0
     ! set now the accumulated fields on land instance
@@ -1195,7 +1186,8 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
 #endif
 
     if((a2racc_am_cnt > 1) .and. rof_heat) then
-       a2racc_am = 1./a2racc_am_cnt * a2racc_am
+       ravg = 1.0_R8/real(a2racc_am_cnt, R8)
+       a2racc_am = a2racc_am * ravg
     endif
     a2racc_am_cnt = 0
     ! set now the accumulated fields on atm instance
@@ -1219,19 +1211,22 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
      endif
     endif
 #endif
-    if(o2racc_om_cnt > 1) then
-       o2racc_om = 1./o2racc_om_cnt *o2racc_om
-    endif
-    o2racc_om_cnt = 0
-    ! set now the accumulated fields on ocn instance
-    tagname = trim(sharedFieldsOcnRof)//C_NULL_CHAR
-    arrsize = nfields_sh_or * lsize_om
-    ent_type = 1 ! cell type
-    if (arrsize > 0 ) then
-      ierr = iMOAB_SetDoubleTagStorage ( mboxid, tagname, arrsize , ent_type, o2racc_om)
-      if (ierr .ne. 0) then
-         call shr_sys_abort(subname//' error in setting accumulated shared fields on rof on ocn instance ')
-      endif
+    if (ocn_c2_rof) then  ! Need to add this else mboxid.  TODO: need to make averaging tags
+       if(o2racc_om_cnt > 1) then
+          ravg = 1.0_R8/real(o2racc_om_cnt, R8)
+          o2racc_om = o2racc_om * ravg
+       endif
+       o2racc_om_cnt = 0
+       ! set now the accumulated fields on ocn instance
+       tagname = trim(sharedFieldsOcnRof)//C_NULL_CHAR
+       arrsize = nfields_sh_or * lsize_om
+       ent_type = 1 ! cell type
+       if (arrsize > 0 ) then
+         ierr = iMOAB_SetDoubleTagStorage ( mboxid, tagname, arrsize , ent_type, o2racc_om)
+         if (ierr .ne. 0) then
+            call shr_sys_abort(subname//' error in setting accumulated shared fields on rof on ocn instance ')
+         endif
+       endif
    endif
 #ifdef MOABDEBUG
     if (mboxid .ge. 0 ) then !  we are on coupler pes, for sure
@@ -1395,24 +1390,22 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
           index_l2x_Flrl_irrig  = mct_aVect_indexRA(l2x_r,'Flrl_irrig' )
        end if
        index_l2x_Flrl_rofi   = mct_aVect_indexRA(l2x_r,'Flrl_rofi' )
-       if(trim(cime_model) .eq. 'e3sm') then
-          index_l2x_Flrl_demand = mct_aVect_indexRA(l2x_r,'Flrl_demand' )
-          index_x2r_Flrl_demand = mct_aVect_indexRA(x2r_r,'Flrl_demand' )
-       endif
+       index_l2x_Flrl_demand = mct_aVect_indexRA(l2x_r,'Flrl_demand' )
+
+       index_x2r_Flrl_demand = mct_aVect_indexRA(x2r_r,'Flrl_demand' )
        index_x2r_Flrl_rofsur = mct_aVect_indexRA(x2r_r,'Flrl_rofsur' )
        index_x2r_Flrl_rofgwl = mct_aVect_indexRA(x2r_r,'Flrl_rofgwl' )
        index_x2r_Flrl_rofsub = mct_aVect_indexRA(x2r_r,'Flrl_rofsub' )
        index_x2r_Flrl_rofdto = mct_aVect_indexRA(x2r_r,'Flrl_rofdto' )
        index_x2r_Flrl_rofi   = mct_aVect_indexRA(x2r_r,'Flrl_rofi' )
+
        if (have_irrig_field) then
           index_x2r_Flrl_irrig  = mct_aVect_indexRA(x2r_r,'Flrl_irrig' )
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-         index_l2x_Flrl_Tqsur = mct_aVect_indexRA(l2x_r,'Flrl_Tqsur' )
-         index_l2x_Flrl_Tqsub = mct_aVect_indexRA(l2x_r,'Flrl_Tqsub' )
-         index_x2r_Flrl_Tqsur = mct_aVect_indexRA(x2r_r,'Flrl_Tqsur' )
-         index_x2r_Flrl_Tqsub = mct_aVect_indexRA(x2r_r,'Flrl_Tqsub' )
-       endif
+       index_l2x_Flrl_Tqsur = mct_aVect_indexRA(l2x_r,'Flrl_Tqsur' )
+       index_l2x_Flrl_Tqsub = mct_aVect_indexRA(l2x_r,'Flrl_Tqsub' )
+       index_x2r_Flrl_Tqsur = mct_aVect_indexRA(x2r_r,'Flrl_Tqsur' )
+       index_x2r_Flrl_Tqsub = mct_aVect_indexRA(x2r_r,'Flrl_Tqsub' )
 
        index_l2x_Flrl_rofl_16O = mct_aVect_indexRA(l2x_r,'Flrl_rofl_16O', perrWith='quiet' )
        if ( index_l2x_Flrl_rofl_16O /= 0 ) flds_wiso_rof = .true.
@@ -1450,18 +1443,14 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
             trim(fracstr)//'*l2x%Flrl_rofdto'
        mrgstr(index_x2r_Flrl_rofi) = trim(mrgstr(index_x2r_Flrl_rofi))//' = '// &
             trim(fracstr)//'*l2x%Flrl_rofi'
-       if (trim(cime_model).eq.'e3sm') then
-          mrgstr(index_x2r_Flrl_demand) = trim(mrgstr(index_x2r_Flrl_demand))//' = '// &
+       mrgstr(index_x2r_Flrl_demand) = trim(mrgstr(index_x2r_Flrl_demand))//' = '// &
                trim(fracstr)//'*l2x%Flrl_demand'
-       endif
        if (have_irrig_field) then
           mrgstr(index_x2r_Flrl_irrig) = trim(mrgstr(index_x2r_Flrl_irrig))//' = '// &
                trim(fracstr)//'*l2x%Flrl_irrig'
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-          mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsur))//' = '//'l2x%Flrl_Tqsur'
-          mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsub))//' = '//'l2x%Flrl_Tqsub'
-       endif
+       mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsur))//' = '//'l2x%Flrl_Tqsur'
+       mrgstr(index_x2r_Flrl_Tqsub) = trim(mrgstr(index_x2r_Flrl_Tqsub))//' = '//'l2x%Flrl_Tqsub'
        if ( flds_wiso_rof ) then
           mrgstr(index_x2r_Flrl_rofl_16O) = trim(mrgstr(index_x2r_Flrl_rofl_16O))//' = '// &
                trim(fracstr)//'*l2x%Flrl_rofl_16O'
@@ -1534,16 +1523,12 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
        x2r_r%rAttr(index_x2r_Flrl_rofsub,i) = l2x_r%rAttr(index_l2x_Flrl_rofsub,i) * frac
        x2r_r%rAttr(index_x2r_Flrl_rofdto,i) = l2x_r%rAttr(index_l2x_Flrl_rofdto,i) * frac
        x2r_r%rAttr(index_x2r_Flrl_rofi,i) = l2x_r%rAttr(index_l2x_Flrl_rofi,i) * frac
-       if (trim(cime_model).eq.'e3sm') then
-          x2r_r%rAttr(index_x2r_Flrl_demand,i) = l2x_r%rAttr(index_l2x_Flrl_demand,i) * frac
-       endif
+       x2r_r%rAttr(index_x2r_Flrl_demand,i) = l2x_r%rAttr(index_l2x_Flrl_demand,i) * frac
        if (have_irrig_field) then
           x2r_r%rAttr(index_x2r_Flrl_irrig,i) = l2x_r%rAttr(index_l2x_Flrl_irrig,i) * frac
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-         x2r_r%rAttr(index_x2r_Flrl_Tqsur,i) = l2x_r%rAttr(index_l2x_Flrl_Tqsur,i)
-         x2r_r%rAttr(index_x2r_Flrl_Tqsub,i) = l2x_r%rAttr(index_l2x_Flrl_Tqsub,i)
-       endif
+       x2r_r%rAttr(index_x2r_Flrl_Tqsur,i) = l2x_r%rAttr(index_l2x_Flrl_Tqsur,i)
+       x2r_r%rAttr(index_x2r_Flrl_Tqsub,i) = l2x_r%rAttr(index_l2x_Flrl_Tqsub,i)
        if ( flds_wiso_rof ) then
           x2r_r%rAttr(index_x2r_Flrl_rofl_16O,i) = l2x_r%rAttr(index_l2x_Flrl_rofl_16O,i) * frac
           x2r_r%rAttr(index_x2r_Flrl_rofi_16O,i) = l2x_r%rAttr(index_l2x_Flrl_rofi_16O,i) * frac
@@ -1591,7 +1576,7 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
     first_time = .false.
 
   end subroutine prep_rof_merge
-#ifdef HAVE_MOAB
+
   subroutine prep_rof_mrg_moab  (infodata, cime_model)
    use iMOAB , only : iMOAB_GetMeshInfo, iMOAB_GetDoubleTagStorage, &
      iMOAB_SetDoubleTagStorage, iMOAB_WriteMesh
@@ -1738,24 +1723,23 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
           index_l2x_Flrl_irrig  = mct_aVect_indexRA(l2x_r,'Flrl_irrig' )
        end if
        index_l2x_Flrl_rofi   = mct_aVect_indexRA(l2x_r,'Flrl_rofi' )
-       if(trim(cime_model) .eq. 'e3sm') then
-          index_l2x_Flrl_demand = mct_aVect_indexRA(l2x_r,'Flrl_demand' )
-          index_x2r_Flrl_demand = mct_aVect_indexRA(x2r_r,'Flrl_demand' )
-       endif
+       index_l2x_Flrl_demand = mct_aVect_indexRA(l2x_r,'Flrl_demand' )
+       !index_l2x_coszen_str  = mct_aVect_indexRA(l2x_r,'coszen_str' )
+
+       index_x2r_Flrl_demand = mct_aVect_indexRA(x2r_r,'Flrl_demand' )
        index_x2r_Flrl_rofsur = mct_aVect_indexRA(x2r_r,'Flrl_rofsur' )
        index_x2r_Flrl_rofgwl = mct_aVect_indexRA(x2r_r,'Flrl_rofgwl' )
        index_x2r_Flrl_rofsub = mct_aVect_indexRA(x2r_r,'Flrl_rofsub' )
        index_x2r_Flrl_rofdto = mct_aVect_indexRA(x2r_r,'Flrl_rofdto' )
        index_x2r_Flrl_rofi   = mct_aVect_indexRA(x2r_r,'Flrl_rofi' )
+       !index_x2r_coszen_str  = mct_aVect_indexRA(x2r_r,'coszen_str' )
        if (have_irrig_field) then
           index_x2r_Flrl_irrig  = mct_aVect_indexRA(x2r_r,'Flrl_irrig' )
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-         index_l2x_Flrl_Tqsur = mct_aVect_indexRA(l2x_r,'Flrl_Tqsur' )
-         index_l2x_Flrl_Tqsub = mct_aVect_indexRA(l2x_r,'Flrl_Tqsub' )
-         index_x2r_Flrl_Tqsur = mct_aVect_indexRA(x2r_r,'Flrl_Tqsur' )
-         index_x2r_Flrl_Tqsub = mct_aVect_indexRA(x2r_r,'Flrl_Tqsub' )
-       endif
+       index_l2x_Flrl_Tqsur = mct_aVect_indexRA(l2x_r,'Flrl_Tqsur' )
+       index_l2x_Flrl_Tqsub = mct_aVect_indexRA(l2x_r,'Flrl_Tqsub' )
+       index_x2r_Flrl_Tqsur = mct_aVect_indexRA(x2r_r,'Flrl_Tqsur' )
+       index_x2r_Flrl_Tqsub = mct_aVect_indexRA(x2r_r,'Flrl_Tqsub' )
 
        index_l2x_Flrl_rofl_16O = mct_aVect_indexRA(l2x_r,'Flrl_rofl_16O', perrWith='quiet' )
        if ( index_l2x_Flrl_rofl_16O /= 0 ) flds_wiso_rof = .true.
@@ -1794,18 +1778,16 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
             trim(fracstr)//'*l2x%Flrl_rofdto'
        mrgstr(index_x2r_Flrl_rofi) = trim(mrgstr(index_x2r_Flrl_rofi))//' = '// &
             trim(fracstr)//'*l2x%Flrl_rofi'
-       if (trim(cime_model).eq.'e3sm') then
-          mrgstr(index_x2r_Flrl_demand) = trim(mrgstr(index_x2r_Flrl_demand))//' = '// &
-               trim(fracstr)//'*l2x%Flrl_demand'
-       endif
+       mrgstr(index_x2r_Flrl_demand) = trim(mrgstr(index_x2r_Flrl_demand))//' = '// &
+            trim(fracstr)//'*l2x%Flrl_demand'
+       !mrgstr(index_x2r_coszen_str) = trim(mrgstr(index_x2r_coszen_str))//' = '// &
+       !     trim(fracstr)//'*l2x%coszen_str'
        if (have_irrig_field) then
           mrgstr(index_x2r_Flrl_irrig) = trim(mrgstr(index_x2r_Flrl_irrig))//' = '// &
                trim(fracstr)//'*l2x%Flrl_irrig'
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-          mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsur))//' = '//'l2x%Flrl_Tqsur'
-          mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsub))//' = '//'l2x%Flrl_Tqsub'
-       endif
+       mrgstr(index_x2r_Flrl_Tqsur) = trim(mrgstr(index_x2r_Flrl_Tqsur))//' = '//'l2x%Flrl_Tqsur'
+       mrgstr(index_x2r_Flrl_Tqsub) = trim(mrgstr(index_x2r_Flrl_Tqsub))//' = '//'l2x%Flrl_Tqsub'
        if ( flds_wiso_rof ) then
           mrgstr(index_x2r_Flrl_rofl_16O) = trim(mrgstr(index_x2r_Flrl_rofl_16O))//' = '// &
                trim(fracstr)//'*l2x%Flrl_rofl_16O'
@@ -1900,16 +1882,13 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
        x2r_rm(i,index_x2r_Flrl_rofsub) = l2x_rm(i,index_l2x_Flrl_rofsub) * frac
        x2r_rm(i,index_x2r_Flrl_rofdto) = l2x_rm(i,index_l2x_Flrl_rofdto) * frac
        x2r_rm(i,index_x2r_Flrl_rofi) = l2x_rm(i,index_l2x_Flrl_rofi) * frac
-       if (trim(cime_model).eq.'e3sm') then
-          x2r_rm(i,index_x2r_Flrl_demand) = l2x_rm(i,index_l2x_Flrl_demand) * frac
-       endif
+       !x2r_rm(i,index_x2r_coszen_str) = l2x_rm(i,index_l2x_coszen_str)
+       x2r_rm(i,index_x2r_Flrl_demand) = l2x_rm(i,index_l2x_Flrl_demand) * frac
        if (have_irrig_field) then
           x2r_rm(i,index_x2r_Flrl_irrig) = l2x_rm(i,index_l2x_Flrl_irrig) * frac
        end if
-       if(trim(cime_model) .eq. 'e3sm') then
-         x2r_rm(i,index_x2r_Flrl_Tqsur) = l2x_rm(i,index_l2x_Flrl_Tqsur)
-         x2r_rm(i,index_x2r_Flrl_Tqsub) = l2x_rm(i,index_l2x_Flrl_Tqsub)
-       endif
+       x2r_rm(i,index_x2r_Flrl_Tqsur) = l2x_rm(i,index_l2x_Flrl_Tqsur)
+       x2r_rm(i,index_x2r_Flrl_Tqsub) = l2x_rm(i,index_l2x_Flrl_Tqsub)
        if ( flds_wiso_rof ) then
           x2r_rm(i,index_x2r_Flrl_rofl_16O) = l2x_rm(i,index_l2x_Flrl_rofl_16O) * frac
           x2r_rm(i,index_x2r_Flrl_rofi_16O) = l2x_rm(i,index_l2x_Flrl_rofi_16O) * frac
@@ -1980,7 +1959,7 @@ use iMOAB , only :  iMOAB_GetDoubleTagStorage
 #endif
 
   end subroutine prep_rof_mrg_moab
-#endif
+
   !================================================================================================
 
   subroutine prep_rof_calc_l2r_rx(fractions_lx, timer)
