@@ -1372,7 +1372,7 @@ contains
        
        if (use_fates .and. .not.doalb .and. get_nstep() == 1 .and. nsrest == nsrStartup) then
           if ( (finidat == ' ') .or. & 
-               (fates_radiation_model=='twostream') .and. .not.use_fates_sp) ) then
+               (fates_radiation_model=='twostream' .and. .not.use_fates_sp) ) then
              call alm_fates%wrap_canopy_radiation(bounds_clump,surfalb_vars,nextsw_cday,declinp1)
           end if
        end if
