@@ -17,6 +17,9 @@ module elm_driver
   use elm_varctl             , only : use_erosion, use_fates_sp, use_fan
   use elm_varctl             , only : iac_present
   use elm_varctl             , only : mpi_sync_nstep_freq
+  use elm_varctl             , only : nsrest, nsrStartup
+  use elm_varctl             , only : fates_radiation_model
+  use elm_varctl             , only : finidat
   use elm_time_manager       , only : get_step_size, get_curr_date, get_ref_date, get_nstep, is_beg_curr_day, get_curr_time_string
   use elm_time_manager       , only : get_curr_calday, get_days_per_year
   use elm_varpar             , only : nlevsno, nlevgrnd, crop_prog
@@ -1366,7 +1369,14 @@ contains
        ! ============================================================================
        ! Determine albedos for next time step
        ! ============================================================================
-
+       
+       if (use_fates .and. .not.doalb .and. get_nstep() == 1 .and. nsrest == nsrStartup) then
+          if ( (finidat == ' ') .or. & 
+               (fates_radiation_model=='twostream') .and. .not.use_fates_sp) ) then
+             call alm_fates%wrap_canopy_radiation(bounds_clump,surfalb_vars,nextsw_cday,declinp1)
+          end if
+       end if
+       
        if ( doalb ) then
        
           ! Albedos for non-urban columns
