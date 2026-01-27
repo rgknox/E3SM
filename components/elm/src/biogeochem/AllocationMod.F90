@@ -125,9 +125,9 @@ module AllocationMod
   logical :: crop_supln  = .false.    !Prognostic crop receives supplemental Nitrogen
 
   real(r8), allocatable,target :: veg_rootc_bigleaf(:,:)        ! column-level fine-root biomas kgc/m3
-  real(r8), allocatable,target :: vmax_nh4(:)
-  real(r8), allocatable,target :: vmax_no3(:)
-  real(r8), allocatable,target :: vmax_po4(:)
+  real(r8), allocatable,target :: vmax_nh4_bigleaf(:)
+  real(r8), allocatable,target :: vmax_no3_bigleaf(:)
+  real(r8), allocatable,target :: vmax_po4_bigleaf(:)
   integer,  pointer :: ft_index_bigleaf(:)                      ! array holding the pft index of each competitor
 
   ! ECA parameters
@@ -1312,7 +1312,7 @@ contains
 
                     col_plant_pdemand_vr(c,j) = col_plant_pdemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         elm_fates%fates(ci)%bc_out(s)%vmax_p(f)
+                         elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)
                  end do
 
                  ! [gN/m2/s]
@@ -1630,7 +1630,7 @@ contains
               cp_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cp_scalar  ! This is 1.0
               plant_pdemand_vr_ptr   => plant_pdemand_vr_fates
               km_p_ptr               => elm_fates%fates(ci)%bc_pconst%eca_km_p
-              vmax_p_ptr             => elm_fates%fates(ci)%bc_out(s)%vmax_p
+              vmax_p_ptr             => elm_fates%fates(ci)%bc_out(s)%vmax_po4
               do f = 1, n_pcomp
                  filter_pcomp(f) = f
               end do
