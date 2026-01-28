@@ -911,7 +911,11 @@
     <lname>20TR_SATM_ELM%BGC_SICE_SOCN_MOSART_SGLC_SWAV</lname>
   </compset>
 
-
+  <compset>
+    <alias>I20TRELMFATES</alias>
+    <lname>20TR_DATM%QIA_ELM%BGC-FATES_SICE_SOCN_MOSART_SGLC_SWAV</lname>
+  </compset>
+    
   <!---I cpl history MOAR forcing spinup compsets -->
 
   <compset>
