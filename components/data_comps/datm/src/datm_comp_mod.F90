@@ -1081,8 +1081,8 @@ CONTAINS
              rtmp = maxval(avstrm%rAttr(stdew,:))
              call shr_mpi_max(rtmp,tdewmax,mpicom,'datm_tdew',all=.true.)
           endif
-          if (my_task == master_task) &
-               write(logunit,*) trim(subname),' max values = ',tbotmax,tdewmax,anidrmax
+          !if (my_task == master_task) &
+          !     write(logunit,*) trim(subname),' max values = ',tbotmax,tdewmax,anidrmax
        endif
        lsize = mct_avect_lsize(a2x)
        do n = 1,lsize
