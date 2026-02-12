@@ -57,6 +57,167 @@ module CanopyFluxesMod
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: CanopyFluxes
 
+  !------------------------------------------------------------------------------
+  ! Derived type for patch-level workspace variables in CanopyFluxes
+  ! This groups all per-patch temporary variables to improve cache locality
+  ! and reduce memory footprint in the parallel loop
+  !------------------------------------------------------------------------------
+  type :: worker_type
+     ! Atmospheric and surface properties
+     real(r8) :: zldis              ! reference height minus zero displacement height [m]
+     real(r8) :: ugust_total        ! gustiness including convective velocity [m/s]
+     real(r8) :: dth                ! diff of virtual temp. between ref. height and surface
+     real(r8) :: dthv               ! diff of vir. poten. temp. between ref. height and surface
+     real(r8) :: dqh                ! diff of humidity between ref. height and surface
+     real(r8) :: ur                 ! wind speed at reference height [m/s]
+     real(r8) :: wc                 ! convective velocity [m/s]
+     
+     ! Temperature and humidity profiles
+     real(r8) :: temp1              ! relation for potential temperature profile
+     real(r8) :: temp12m            ! relation for potential temperature profile applied at 2-m
+     real(r8) :: temp2              ! relation for specific humidity profile
+     real(r8) :: temp22m            ! relation for specific humidity profile applied at 2-m
+     real(r8) :: tstar              ! temperature scaling parameter
+     real(r8) :: qstar              ! moisture scaling parameter
+     real(r8) :: thvstar            ! virtual potential temperature scaling parameter
+     
+     ! Canopy air properties
+     real(r8) :: taf                ! air temperature within canopy space [K]
+     real(r8) :: qaf                ! humidity of canopy air [kg/kg]
+     
+     ! Resistances
+     real(r8) :: rb                 ! leaf boundary layer resistance [s/m]
+     real(r8) :: rah(2)             ! thermal resistance [s/m] (above/below canopy)
+     real(r8) :: raw(2)             ! moisture resistance [s/m] (above/below canopy)
+     
+     ! Heat conductances
+     real(r8) :: wta                ! heat conductance for air [m/s]
+     real(r8) :: wtl                ! heat conductance for leaf [m/s]
+     real(r8) :: wtg                ! heat conductance for ground [m/s]
+     real(r8) :: wta0               ! normalized heat conductance for air [-]
+     real(r8) :: wtl0               ! normalized heat conductance for leaf [-]
+     real(r8) :: wtg0               ! normalized heat conductance for ground [-]
+     real(r8) :: wtal               ! normalized heat conductance for air and leaf [-]
+     real(r8) :: wtga               ! normalized heat cond. for air and ground [-]
+     real(r8) :: wtshi              ! sensible heat resistance for air, grnd and leaf [-]
+     
+     ! Latent heat conductances
+     real(r8) :: wtaq               ! latent heat conductance for air [m/s]
+     real(r8) :: wtlq               ! latent heat conductance for leaf [m/s]
+     real(r8) :: wtgq               ! latent heat conductance for ground [m/s]
+     real(r8) :: wtaq0              ! normalized latent heat conductance for air [-]
+     real(r8) :: wtlq0              ! normalized latent heat conductance for leaf [-]
+     real(r8) :: wtgq0              ! normalized heat conductance for ground [-]
+     real(r8) :: wtalq              ! normalized latent heat cond. for air and leaf [-]
+     real(r8) :: wtgaq              ! normalized latent heat cond. for air and ground [-]
+     real(r8) :: wtsqi              ! latent heat resistance for air, grnd and leaf [-]
+     
+     ! Saturation and vapor pressure
+     real(r8) :: el                 ! vapor pressure on leaf surface [pa]
+     real(r8) :: deldT              ! derivative of "el" on "t_veg" [pa/K]
+     real(r8) :: qsatl              ! leaf specific humidity [kg/kg]
+     real(r8) :: qsatldT            ! derivative of "qsatl" on "t_veg"
+     real(r8) :: e_ref2m            ! 2 m height surface saturated vapor pressure [Pa]
+     real(r8) :: de2mdT             ! derivative of 2 m height surface saturated vapor pressure on t_ref2m
+     real(r8) :: qsat_ref2m         ! 2 m height surface saturated specific humidity [kg/kg]
+     real(r8) :: dqsat2mdT          ! derivative of 2 m height surface saturated specific humidity on t_ref2m
+     real(r8) :: svpts              ! saturation vapor pressure at t_veg (pa)
+     real(r8) :: eah                ! canopy air vapor pressure (pa)
+     
+     ! Radiation terms
+     real(r8) :: air                ! atmos. radiation temporary set
+     real(r8) :: bir                ! atmos. radiation temporary set
+     real(r8) :: cir                ! atmos. radiation temporary set
+     real(r8) :: lw_grnd            ! ground longwave radiation
+     
+     ! Energy flux derivatives and temporaries
+     real(r8) :: dc1                ! derivative of energy flux [W/m2/K]
+     real(r8) :: dc2                ! derivative of energy flux [W/m2/K]
+     real(r8) :: delt               ! temporary
+     real(r8) :: delq               ! temporary
+     real(r8) :: delt_snow          ! temperature difference for snow
+     real(r8) :: delt_soil          ! temperature difference for soil
+     real(r8) :: delt_h2osfc        ! temperature difference for surface water
+     real(r8) :: delq_snow          ! humidity difference for snow
+     real(r8) :: delq_soil          ! humidity difference for soil
+     real(r8) :: delq_h2osfc        ! humidity difference for surface water
+     
+     ! Iteration variables
+     real(r8) :: del                ! absolute change in leaf temp in current iteration [K]
+     real(r8) :: del2               ! change in leaf temperature in previous iteration [K]
+     real(r8) :: dele               ! change in latent heat flux from leaf [K]
+     real(r8) :: dels               ! change in leaf temperature in current iteration [K]
+     real(r8) :: det                ! maximum leaf temp. change in two consecutive iter [K]
+     real(r8) :: tlbef              ! leaf temperature from previous iteration [K]
+     
+     ! Evaporation and transpiration
+     real(r8) :: rpp                ! fraction of potential evaporation from leaf [-]
+     real(r8) :: rppdry             ! fraction of potential evaporation through transp [-]
+     real(r8) :: efeb               ! latent heat flux from leaf (previous iter) [mm/s]
+     real(r8) :: efeold             ! latent heat flux from leaf (previous iter) [mm/s]
+     real(r8) :: efpot              ! potential latent energy flux [kg/m2/s]
+     real(r8) :: efe                ! water flux from leaf [mm/s]
+     real(r8) :: efsh               ! sensible heat from leaf [mm/s]
+     real(r8) :: ecidif             ! excess energies [W/m2]
+     real(r8) :: erre               ! balance error
+     
+     ! Atmospheric composition
+     real(r8) :: co2                ! atmospheric co2 partial pressure (pa)
+     real(r8) :: c13o2              ! atmospheric c13o2 partial pressure (pa)
+     real(r8) :: o2                 ! atmospheric o2 partial pressure (pa)
+     
+     ! Stomatal resistance (for convergence checking)
+     real(r8) :: rssun_old          ! previous sunlit stomatal resistance (s/m)
+     real(r8) :: rssha_old          ! previous shaded stomatal resistance (s/m)
+     
+     ! Stability and turbulence
+     real(r8) :: obuold             ! Obukhov length scale from previous iteration
+     integer  :: nmozsgn            ! number of times stability changes sign
+     real(r8) :: fm                 ! needed for BGC only to diagnose 10m wind speed
+     
+     ! Canopy properties
+     real(r8) :: cf                 ! heat transfer coefficient from leaves [-]
+     real(r8) :: exp_ai             ! exp(-LSAI)
+     real(r8) :: egvf               ! effective green vegetation fraction
+     real(r8) :: lt                 ! elai+esai
+     
+     ! Soil and litter properties
+     real(r8) :: csoilb             ! turbulent transfer coefficient over bare soil (unitless)
+     real(r8) :: csoilcn            ! interpolated csoilc for less than dense canopies
+     real(r8) :: ri                 ! stability parameter for under canopy air (unitless)
+     real(r8) :: ricsoilc           ! modified transfer coefficient under dense canopy (unitless)
+     real(r8) :: snow_depth_c       ! critical snow depth to cover plant litter (m)
+     real(r8) :: rdl                ! dry litter layer resistance for water vapor (s/m)
+     real(r8) :: elai_dl            ! exposed (dry) plant litter area index
+     real(r8) :: fsno_dl            ! effective snow cover over plant litter
+     
+     ! Soil moisture and root properties
+     real(r8) :: s_node             ! vol_liq/eff_porosity
+     real(r8) :: smp_node           ! matrix potential
+     real(r8) :: smp_node_lf        ! F. Li and S. Levis
+     real(r8) :: vol_liq            ! partial volume of liquid water in layer
+     real(r8) :: vol_liq_so         ! partial volume of liquid water for smp_node = smpso
+     real(r8) :: h2osoi_liq_so      ! liquid water corresponding to vol_liq_so [kg/m2]
+     real(r8) :: h2osoi_liq_sat     ! liquid water at eff_porosity [kg/m2]
+     real(r8) :: deficit            ! soil moisture deficit [kg/m2]
+     
+     ! Wind stress (implicit coupling)
+     real(r8) :: wind_speed0        ! wind speed from atmosphere at start of iteration
+     real(r8) :: wind_speed_adj     ! adjusted wind speed for iteration
+     real(r8) :: tau                ! stress used in iteration
+     real(r8) :: tau_diff           ! difference from previous iteration tau
+     real(r8) :: prev_tau           ! previous iteration tau
+     real(r8) :: prev_tau_diff      ! previous difference in iteration tau
+     
+     ! Iteration counters and convergence flags
+     integer  :: itlef              ! counter for leaf temperature iteration [-]
+     integer  :: itstoma            ! counter for stoma iteration [-]
+     integer  :: iter_final         ! number of iterations used
+     logical  :: converge_stoma     ! stomatal convergence flag
+     logical  :: converge_tveg      ! temperature convergence flag
+     real(r8) :: del_gs             ! max difference in stomatal conductance [m/s]
+  end type worker_type
+
 contains
 
   !------------------------------------------------------------------------------
@@ -167,100 +328,22 @@ contains
     !added by K.Sakaguchi for stability formulation
     real(r8), parameter :: ria  = 0.5_r8             ! free parameter for stable formulation (currently = 0.5, "gamma" in Sakaguchi&Zeng,2008)
 
+    ! Arrays that remain (used before/after loop or need to persist)
     real(r8) :: zldis(bounds%begp:bounds%endp)       ! reference height "minus" zero displacement height [m]
-    real(r8) :: wc                                   ! convective velocity [m/s]
-    real(r8) :: ugust_total(bounds%begp:bounds%endp) ! gustiness including convective velocity [m/s]
-    real(r8) :: dth(bounds%begp:bounds%endp)         ! diff of virtual temp. between ref. height and surface
-    real(r8) :: dthv(bounds%begp:bounds%endp)        ! diff of vir. poten. temp. between ref. height and surface
-    real(r8) :: dqh(bounds%begp:bounds%endp)         ! diff of humidity between ref. height and surface
-    real(r8) :: ur(bounds%begp:bounds%endp)          ! wind speed at reference height [m/s]
-    real(r8) :: temp1(bounds%begp:bounds%endp)       ! relation for potential temperature profile
-    real(r8) :: temp12m(bounds%begp:bounds%endp)     ! relation for potential temperature profile applied at 2-m
-    real(r8) :: temp2(bounds%begp:bounds%endp)       ! relation for specific humidity profile
-    real(r8) :: temp22m(bounds%begp:bounds%endp)     ! relation for specific humidity profile applied at 2-m
-    real(r8) :: tstar                                ! temperature scaling parameter
-    real(r8) :: qstar                                ! moisture scaling parameter
-    real(r8) :: thvstar                              ! virtual potential temperature scaling parameter
-    real(r8) :: taf(bounds%begp:bounds%endp)         ! air temperature within canopy space [K]
-    real(r8) :: qaf(bounds%begp:bounds%endp)         ! humidity of canopy air [kg/kg]
-    real(r8) :: rpp                                  ! fraction of potential evaporation from leaf [-]
-    real(r8) :: rppdry                               ! fraction of potential evaporation through transp [-]
-    real(r8) :: cf                                   ! heat transfer coefficient from leaves [-]
-    real(r8) :: cf_bare                              ! heat transfer coefficient from bare ground [-]
-    real(r8) :: rb(bounds%begp:bounds%endp)          ! leaf boundary layer resistance [s/m]
-    real(r8) :: rah(bounds%begp:bounds%endp,2)       ! thermal resistance [s/m]
-    real(r8) :: raw(bounds%begp:bounds%endp,2)       ! moisture resistance [s/m]
-    real(r8) :: wta                                  ! heat conductance for air [m/s]
-    real(r8) :: wtg(bounds%begp:bounds%endp)         ! heat conductance for ground [m/s]
-    real(r8) :: wtl                                  ! heat conductance for leaf [m/s]
-    real(r8) :: wta0(bounds%begp:bounds%endp)        ! normalized heat conductance for air [-]
-    real(r8) :: wtl0(bounds%begp:bounds%endp)        ! normalized heat conductance for leaf [-]
-    real(r8) :: wtg0                                 ! normalized heat conductance for ground [-]
-    real(r8) :: wtal(bounds%begp:bounds%endp)        ! normalized heat conductance for air and leaf [-]
-    real(r8) :: wtga                                 ! normalized heat cond. for air and ground  [-]
-    real(r8) :: wtaq                                 ! latent heat conductance for air [m/s]
-    real(r8) :: wtlq                                 ! latent heat conductance for leaf [m/s]
-    real(r8) :: wtgq(bounds%begp:bounds%endp)        ! latent heat conductance for ground [m/s]
-    real(r8) :: wtaq0(bounds%begp:bounds%endp)       ! normalized latent heat conductance for air [-]
-    real(r8) :: wtlq0(bounds%begp:bounds%endp)       ! normalized latent heat conductance for leaf [-]
-    real(r8) :: wtgq0                                ! normalized heat conductance for ground [-]
-    real(r8) :: wtalq(bounds%begp:bounds%endp)       ! normalized latent heat cond. for air and leaf [-]
-    real(r8) :: wtgaq                                ! normalized latent heat cond. for air and ground [-]
-    real(r8) :: el(bounds%begp:bounds%endp)          ! vapor pressure on leaf surface [pa]
-    real(r8) :: deldT                                ! derivative of "el" on "t_veg" [pa/K]
-    real(r8) :: qsatl(bounds%begp:bounds%endp)       ! leaf specific humidity [kg/kg]
-    real(r8) :: qsatldT(bounds%begp:bounds%endp)     ! derivative of "qsatl" on "t_veg"
-    real(r8) :: e_ref2m                              ! 2 m height surface saturated vapor pressure [Pa]
-    real(r8) :: de2mdT                               ! derivative of 2 m height surface saturated vapor pressure on t_ref2m
-    real(r8) :: qsat_ref2m                           ! 2 m height surface saturated specific humidity [kg/kg]
-    real(r8) :: dqsat2mdT                            ! derivative of 2 m height surface saturated specific humidity on t_ref2m
-    real(r8) :: air(bounds%begp:bounds%endp)         ! atmos. radiation temporay set
-    real(r8) :: bir(bounds%begp:bounds%endp)         ! atmos. radiation temporay set
-    real(r8) :: cir(bounds%begp:bounds%endp)         ! atmos. radiation temporay set
-    real(r8) :: dc1,dc2                              ! derivative of energy flux [W/m2/K]
-    real(r8) :: delt                                 ! temporary
-    real(r8) :: delq(bounds%begp:bounds%endp)        ! temporary
-    real(r8) :: del(bounds%begp:bounds%endp)         ! absolute change in leaf temp in current iteration [K]
-    real(r8) :: del2(bounds%begp:bounds%endp)        ! change in leaf temperature in previous iteration [K]
-    real(r8) :: dele(bounds%begp:bounds%endp)        ! change in latent heat flux from leaf [K]
-    real(r8) :: dels                                 ! change in leaf temperature in current iteration [K]
-    real(r8) :: det(bounds%begp:bounds%endp)         ! maximum leaf temp. change in two consecutive iter [K]
-    real(r8) :: efeb(bounds%begp:bounds%endp)        ! latent heat flux from leaf (previous iter) [mm/s]
-    real(r8) :: efeold                               ! latent heat flux from leaf (previous iter) [mm/s]
-    real(r8) :: efpot                                ! potential latent energy flux [kg/m2/s]
-    real(r8) :: efe(bounds%begp:bounds%endp)         ! water flux from leaf [mm/s]
-    real(r8) :: efsh                                 ! sensible heat from leaf [mm/s]
-    real(r8) :: obuold(bounds%begp:bounds%endp)      ! Obukhov length scale from previous iteration
-    real(r8) :: tlbef(bounds%begp:bounds%endp)       ! leaf temperature from previous iteration [K]
-    real(r8) :: ecidif                               ! excess energies [W/m2]
     real(r8) :: err(bounds%begp:bounds%endp)         ! balance error
-    real(r8) :: erre                                 ! balance error
-    real(r8) :: co2(bounds%begp:bounds%endp)         ! atmospheric co2 partial pressure (pa)
-    real(r8) :: c13o2(bounds%begp:bounds%endp)       ! atmospheric c13o2 partial pressure (pa)
-    real(r8) :: o2(bounds%begp:bounds%endp)          ! atmospheric o2 partial pressure (pa)
-    real(r8) :: svpts(bounds%begp:bounds%endp)       ! saturation vapor pressure at t_veg (pa)
-    real(r8) :: eah(bounds%begp:bounds%endp)         ! canopy air vapor pressure (pa)
-    real(r8) :: rssun_old(bounds%begp:bounds%endp)   ! used for determining convergence via change in resitance
-    real(r8) :: rssha_old(bounds%begp:bounds%endp)   !   from one iteration to the next
-    real(r8) :: s_node                               ! vol_liq/eff_porosity
-    real(r8) :: smp_node                             ! matrix potential
-    real(r8) :: smp_node_lf                          ! F. Li and S. Levis
-    real(r8) :: vol_liq                              ! partial volume of liquid water in layer
-    integer  :: itlef                                ! counter for leaf temperature iteration [-]
-    integer  :: itstoma                              ! counter for stoma iteration [-]
-    integer  :: iter_final                           ! number of iterations used
-    integer  :: nmozsgn(bounds%begp:bounds%endp)     ! number of times stability changes sign
-    real(r8) :: w                                    ! exp(-LSAI)
-    real(r8) :: csoilcn                              ! interpolated csoilc for less than dense canopies
-    real(r8) :: fm(bounds%begp:bounds%endp)          ! needed for BGC only to diagnose 10m wind speed
-    real(r8) :: wtshi                                ! sensible heat resistance for air, grnd and leaf [-]
-    real(r8) :: wtsqi                                ! latent heat resistance for air, grnd and leaf [-]
+    real(r8) :: dayl_factor(bounds%begp:bounds%endp) ! scalar (0-1) for daylength effect on Vcmax
+    real(r8) :: dt_veg(bounds%begp:bounds%endp)      ! change in t_veg, last iteration (Kelvin)
+    logical  :: check_for_irrig(bounds%begp:bounds%endp) ! where do we need to check soil moisture to see if we need to irrigate?
+    logical  :: frozen_soil(bounds%begp:bounds%endp)     ! set to true if we have encountered a frozen soil layer
+    
+    ! Scalars and indices
+    real(r8) :: cf_bare                              ! heat transfer coefficient from bare ground [-]
     integer  :: j                                    ! soil/snow level index
     integer  :: p                                    ! patch index
     integer  :: c                                    ! column index
     integer  :: l                                    ! landunit index
     integer  :: t                                    ! topounit index
-    integer  :: tpu_ind                                      ! index of topounit to grid
+    integer  :: tpu_ind                              ! index of topounit to grid
     integer  :: g                                    ! gridcell index
     integer  :: fp                                   ! lake filter pft index
     integer  :: fn_noveg                             ! number of values in bare ground pft filter
@@ -270,56 +353,19 @@ contains
     integer  :: f                                    ! filter index
     logical  :: found                                ! error flag for canopy above forcing hgt
     integer  :: index                                ! patch index for error
-    real(r8) :: egvf                                 ! effective green vegetation fraction
-    real(r8) :: lt                                   ! elai+esai
-    real(r8) :: ri                                   ! stability parameter for under canopy air (unitless)
-    real(r8) :: csoilb                               ! turbulent transfer coefficient over bare soil (unitless)
-    real(r8) :: ricsoilc                             ! modified transfer coefficient under dense canopy (unitless)
-    real(r8) :: snow_depth_c                         ! critical snow depth to cover plant litter (m)
-    real(r8) :: rdl                                  ! dry litter layer resistance for water vapor  (s/m)
-    real(r8) :: elai_dl                              ! exposed (dry) plant litter area index
-    real(r8) :: fsno_dl                              ! effective snow cover over plant litter
-    real(r8) :: dayl_factor(bounds%begp:bounds%endp) ! scalar (0-1) for daylength effect on Vcmax
-    ! If no unfrozen layers, put all in the top layer.
-    real(r8) :: rootsum(bounds%begp:bounds%endp)
-    real(r8) :: delt_snow
-    real(r8) :: delt_soil
-    real(r8) :: delt_h2osfc
-    real(r8) :: lw_grnd
-    real(r8) :: delq_snow
-    real(r8) :: delq_soil
-    real(r8) :: delq_h2osfc
-    integer  :: local_time                               ! local time at start of time step (seconds after solar midnight)
+    integer  :: local_time                           ! local time at start of time step (seconds after solar midnight)
     integer  :: seconds_since_irrig_start_time
-    integer  :: irrig_nsteps_per_day                     ! number of time steps per day in which we irrigate
-    logical  :: check_for_irrig(bounds%begp:bounds%endp) ! where do we need to check soil moisture to see if we need to irrigate?
-    logical  :: frozen_soil(bounds%begp:bounds%endp)     ! set to true if we have encountered a frozen soil layer
-    real(r8) :: vol_liq_so                               ! partial volume of liquid water in layer for which smp_node = smpso
-    real(r8) :: h2osoi_liq_so                            ! liquid water corresponding to vol_liq_so for this layer [kg/m2]
-    real(r8) :: h2osoi_liq_sat                           ! liquid water corresponding to eff_porosity for this layer [kg/m2]
-    real(r8) :: deficit                                  ! difference between desired soil moisture level for this layer and
-                                                         ! current soil moisture level [kg/m2]
-    real(r8) :: dt_veg(bounds%begp:bounds%endp)          ! change in t_veg, last iteration (Kelvin)
-    integer  :: jtop(bounds%begc:bounds%endc)            ! lbning
+    integer  :: irrig_nsteps_per_day                 ! number of time steps per day in which we irrigate
+    integer  :: jtop(bounds%begc:bounds%endc)        ! lbning
     integer  :: filterc_tmp(bounds%endp-bounds%begp+1)   ! temporary variable
-    integer  :: ft                                       ! plant functional type index
+    integer  :: ft                                   ! plant functional type index
     real(r8) :: temprootr
-    real(r8) :: dt_veg_temp(bounds%begp:bounds%endp)
     integer  :: iv
-    real(r8) :: wind_speed0(bounds%begp:bounds%endp) ! Wind speed from atmosphere at start of iteration
-    real(r8) :: wind_speed_adj(bounds%begp:bounds%endp) ! Adjusted wind speed for iteration
-    real(r8) :: tau(bounds%begp:bounds%endp)      ! Stress used in iteration
-    real(r8) :: tau_diff(bounds%begp:bounds%endp) ! Difference from previous iteration tau
-    real(r8) :: prev_tau(bounds%begp:bounds%endp) ! Previous iteration tau
-    real(r8) :: prev_tau_diff(bounds%begp:bounds%endp) ! Previous difference in iteration tau
 
     character(len=64) :: event !! timing event
-
-    logical :: converge_stoma ! logical switch that flags if the tveg loop converged
-    logical :: converge_tveg  ! logical swithc that flags if the stomatal loop converged
-    real(r8) :: del_gs        ! The maximum difference in stomatal conductance
-                              ! from current iteration to previous, between sunlit and
-                              ! shaded portions of the leaves [m/s]
+    
+    ! Worker type for patch-level temporary variables
+    type(worker_type) :: w                           ! Patch workspace variables
     
     ! Indices for raw and rah
     integer, parameter :: above_canopy = 1         ! Above canopy
@@ -529,21 +575,6 @@ contains
       end if
 #endif
 
-
-      ! Initialize
-      do f = 1, fn
-         p = filterp(f)
-         del(p)    = 0._r8  ! change in leaf temperature from previous iteration
-         efeb(p)   = 0._r8  ! latent head flux from leaf for previous iteration
-         wtlq0(p)  = 0._r8
-         wtalq(p)  = 0._r8
-         wtgq(p)   = 0._r8
-         wtaq0(p)  = 0._r8
-         obuold(p) = 0._r8
-         btran(p)  = btran0
-         btran2(p)  = btran0
-      end do
-
       ! calculate daylength control for Vcmax
       do f = 1, fn
          p=filterp(f)
@@ -687,118 +718,96 @@ contains
          end do        ! do f
       end do           ! do j
 
-      ! Modify aerodynamic parameters for sparse/dense canopy (X. Zeng)
-      do f = 1, fn
-         p = filterp(f)
-         c = veg_pp%column(p)
+      event = 'can_iter'
+      call t_start_lnd(event)
 
-         lt = min(elai(p)+esai(p), tlsai_crit)
-         egvf =(1._r8 - alpha_aero * exp(-lt)) / (1._r8 - alpha_aero * exp(-tlsai_crit))
-         displa(p) = egvf * displa(p)
-         z0mv(p)   = exp(egvf * log(z0mv(p)) + (1._r8 - egvf) * log(z0mg(c)))
-         z0hv(p)   = z0mv(p)
-         z0qv(p)   = z0mv(p)
-      end do
+      
+      ! Use adaptive scheduling based on workload variability:
+      ! - FATES: dynamic(1) for highly variable photosynthesis costs
+      ! - Non-FATES: guided for lower overhead with more uniform work
+      if (use_fates) then
+         !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(DYNAMIC, 1)
+      else
+         !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(GUIDED)
+      end if
 
-      found = .false.
-      do f = 1, fn
+      do_patch: do f = 1, fn
          p = filterp(f)
          c = veg_pp%column(p)
          t = veg_pp%topounit(p)
          g = veg_pp%gridcell(p)
+
+         ! Initialize worker variables
+         w%del = 0._r8
+         w%efeb = 0._r8
+         w%wtlq0 = 0._r8
+         w%wtalq = 0._r8
+         w%wtgq = 0._r8
+         w%wtaq0 = 0._r8
+         w%obuold = 0._r8
+         w%nmozsgn = 0
+
+         ! Modify aerodynamic parameters for sparse/dense canopy (X. Zeng)
+         w%lt = min(elai(p)+esai(p), tlsai_crit)
+         w%egvf =(1._r8 - alpha_aero * exp(-w%lt)) / (1._r8 - alpha_aero * exp(-tlsai_crit))
+         displa(p) = w%egvf * displa(p)
+         z0mv(p)   = exp(w%egvf * log(z0mv(p)) + (1._r8 - w%egvf) * log(z0mg(c)))
+         z0hv(p)   = z0mv(p)
+         z0qv(p)   = z0mv(p)
 
          ! Net absorbed longwave radiation by canopy and ground
          ! =air+bir*t_veg**4+cir*t_grnd(c)**4
 
-         air(p) =   emv(p) * (1._r8+(1._r8-emv(p))*(1._r8-emg(c))) * forc_lwrad(t)
-         bir(p) = - (2._r8-emv(p)*(1._r8-emg(c))) * emv(p) * sb
-         cir(p) =   emv(p)*emg(c)*sb
+         w%air =   emv(p) * (1._r8+(1._r8-emv(p))*(1._r8-emg(c))) * forc_lwrad(t)
+         w%bir = - (2._r8-emv(p)*(1._r8-emg(c))) * emv(p) * sb
+         w%cir =   emv(p)*emg(c)*sb
 
          ! Saturated vapor pressure, specific humidity, and their derivatives
          ! at the leaf surface
 
-         call QSat (t_veg(p), forc_pbot(t), el(p), deldT, qsatl(p), qsatldT(p))
+         call QSat (t_veg(p), forc_pbot(t), w%el, w%deldT, w%qsatl, w%qsatldT)
 
          ! Determine atmospheric co2 and o2
 
-         co2(p) = forc_pco2(t)
-         o2(p)  = forc_po2(t)
+         w%co2 = forc_pco2(t)
+         w%o2  = forc_po2(t)
 
          if ( use_c13 ) then
-            c13o2(p) = forc_pc13o2(t)
+            w%c13o2 = forc_pc13o2(t)
          end if
 
          ! Initialize flux profile
 
-         nmozsgn(p) = 0
-
-         taf(p) = (t_grnd(c) + thm(p))/2._r8
-         qaf(p) = (forc_q(t)+qg(c))/2._r8
+         w%taf = (t_grnd(c) + thm(p))/2._r8
+         w%qaf = (forc_q(t)+qg(c))/2._r8
 
          ! Initialize winds for iteration.
          if (implicit_stress) then
-            wind_speed0(p) = max(0.01_r8, hypot(forc_u(t), forc_v(t)))
-            wind_speed_adj(p) = wind_speed0(p)
-            ur(p) = max(1.0_r8, sqrt(wind_speed_adj(p)**2 + ugust(t)**2))
+            w%wind_speed0 = max(0.01_r8, hypot(forc_u(t), forc_v(t)))
+            w%wind_speed_adj = w%wind_speed0
+            w%ur = max(1.0_r8, sqrt(w%wind_speed_adj**2 + ugust(t)**2))
 
-            prev_tau(p) = tau_est(t)
+            w%prev_tau = tau_est(t)
          else
-            ur(p) = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)+ugust(t)*ugust(t)))
+            w%ur = max(1.0_r8,sqrt(forc_u(t)*forc_u(t)+forc_v(t)*forc_v(t)+ugust(t)*ugust(t)))
          end if
-         tau_diff(p) = 1.e100_r8
-         ugust_total(p) = ugust(t)
+         w%tau_diff = 1.e100_r8
+         w%ugust_total = ugust(t)
 
-         dth(p) = thm(p)-taf(p)
-         dqh(p) = forc_q(t)-qaf(p)
-         delq(p) = qg(c) - qaf(p)
-         dthv(p) = dth(p)*(1._r8+0.61_r8*forc_q(t))+0.61_r8*forc_th(t)*dqh(p)
+         w%dth = thm(p)-w%taf
+         w%dqh = forc_q(t)-w%qaf
+         w%delq = qg(c) - w%qaf
+         w%dthv = w%dth*(1._r8+0.61_r8*forc_q(t))+0.61_r8*forc_th(t)*w%dqh
          zldis(p) = forc_hgt_u_patch(p) - displa(p)
 
-
-         ! Check to see if the forcing height is below the canopy height
-         if (zldis(p) < 0._r8) then
-            found = .true.
-            index = p
-         end if
-
-      end do
-
-      if (found) then
-         if ( .not. use_fates ) then
-#ifndef _OPENACC
-            write(iulog,*)'Error: Forcing height is below canopy height for pft index '
-            call endrun(decomp_index=index, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
-#endif
-         end if
-      end if
-
-      event = 'can_iter'
-      call t_start_lnd(event)
-
-      !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,itstoma,itlef,converge_stoma, &
-      !$OMP                      converge_tveg,cf,w,csoilb,ri,csoilcn,  &
-      !$OMP                      ricsoilc,wta,wtl,wtshi,wtg0,wtga,rppdry, &
-      !$OMP                      efpot,rpp,wtaq,wtlq,snow_depth_c,fsno_dl, &
-      !$OMP                      elai_dl,rdl,wtsqi,wtgq0,dc1,dc2,efsh,     &
-      !$OMP                      efeold,erre,lw_grnd,dels,ecidif,tstar,    &
-      !$OMP                      qstar,thvstar,iter_final,del_gs ) if (use_fates)
-      
-      patch_loop1: do f = 1, fn
-
-         p = filterp(f)
-         c = veg_pp%column(p)
-         t = veg_pp%topounit(p)
-         g = veg_pp%gridcell(p)
-
-
          ! Initialize Obukhov length scale and wind speed
-         call MoninObukIni(ur(p), thv(c), dthv(p), zldis(p), z0mv(p), um(p), obu(p))
+         call MoninObukIni([w%ur], thv(c), [w%dthv], [zldis(p)], [z0mv(p)], [um(p)], [obu(p)])
          
          num_iter(p) = 0
          !rssun(p) is carried over from previous time-step
          !rssha(p) is carried over from previous time-step
-         rssun_old(p) = -100._r8
-         rssha_old(p) = -100._r8
+         w%rssun_old = -100._r8
+         w%rssha_old = -100._r8
         
 
          ! Begin stability iterations
@@ -806,40 +815,40 @@ contains
          ! of stomatal conductance convergence. We nest these
          ! loops to minimize stomatal conductance calculations
 
-         itstoma = 0
-         converge_stoma = .false.
-         iterate_stoma: do while(.not.converge_stoma) 
+         w%itstoma = 0
+         w%converge_stoma = .false.
+         iterate_stoma: do while(.not.w%converge_stoma) 
 
             ! Set counter for leaf temperature iteration (itlef)
-            itlef = 1
-            converge_tveg = .false.
-            iterate_tveg: do while(.not.converge_tveg)
+            w%itlef = 1
+            w%converge_tveg = .false.
+            iterate_tveg: do while(.not.w%converge_tveg)
             
                ! Determine friction velocity, and potential temperature and humidity
                ! profiles of the surface boundary layer
-               call FrictionVelocity (begp, endp, 1, filterp(f), &
-                    displa(begp:endp), z0mv(begp:endp), z0hv(begp:endp), z0qv(begp:endp), &
-                    obu(begp:endp), itlef, ur(begp:endp), um(begp:endp), ugust_total(begp:endp), ustar(begp:endp), &
-                    temp1(begp:endp), temp2(begp:endp), temp12m(begp:endp), temp22m(begp:endp), fm(begp:endp), &
+               call FrictionVelocity (begp, endp, 1, [p], &
+                    [displa(p)], [z0mv(p)], [z0hv(p)], [z0qv(p)], &
+                    [obu(p)], w%itlef, [w%ur], [um(p)], [w%ugust_total], [ustar(p)], &
+                    [w%temp1], [w%temp2], [w%temp12m], [w%temp22m], [w%fm], &
                     frictionvel_vars)
                
-               tlbef(p) = t_veg(p)
-               del2(p) = del(p)
+               w%tlbef = t_veg(p)
+               w%del2 = w%del
 
                ! Determine aerodynamic resistances
                ram1(p)  = 1._r8/(ustar(p)*ustar(p)/um(p))
-               rah(p,above_canopy) = 1._r8/(temp1(p)*ustar(p))
-               raw(p,above_canopy) = 1._r8/(temp2(p)*ustar(p))
+               w%rah(above_canopy) = 1._r8/(w%temp1*ustar(p))
+               w%raw(above_canopy) = 1._r8/(w%temp2*ustar(p))
 
                ! Forbid removing more than 99% of wind speed in a time step.
                ! This is mainly to avoid convergence issues since this is such a
                ! basic form of iteration in this loop...
                if (implicit_stress) then
-                  tau(p) = forc_rho(t)*wind_speed_adj(p)/ram1(p)
-                  call shr_flux_update_stress(wind_speed0(p), wsresp(t), tau_est(t), &
-                       tau(p), prev_tau(p), tau_diff(p), prev_tau_diff(p), &
-                       wind_speed_adj(p))
-                  ur(p) = max(1.0_r8, sqrt(wind_speed_adj(p)**2 + ugust(t)**2))
+                  w%tau = forc_rho(t)*w%wind_speed_adj/ram1(p)
+                  call shr_flux_update_stress(w%wind_speed0, wsresp(t), tau_est(t), &
+                       w%tau, w%prev_tau, w%tau_diff, w%prev_tau_diff, &
+                       w%wind_speed_adj)
+                  w%ur = max(1.0_r8, sqrt(w%wind_speed_adj**2 + ugust(t)**2))
                end if
 
                ! Bulk boundary layer resistance of leaves
@@ -854,57 +863,57 @@ contains
                   dleaf_patch(p) = dleaf(veg_pp%itype(p))
                end if
                
-               cf  = 0.01_r8/(sqrt(uaf(p))*sqrt( dleaf_patch(p) ))
+               w%cf  = 0.01_r8/(sqrt(uaf(p))*sqrt( dleaf_patch(p) ))
                
-               rb(p)  = 1._r8/(cf*uaf(p))
-               rb1(p) = rb(p)
+               w%rb  = 1._r8/(w%cf*uaf(p))
+               rb1(p) = w%rb
 
                ! Parameterization for variation of csoilc with canopy density from
                ! X. Zeng, University of Arizona
                
-               w = exp(-(elai(p)+esai(p)))
+               w%exp_ai = exp(-(elai(p)+esai(p)))
                
                ! changed by K.Sakaguchi from here
                ! transfer coefficient over bare soil is changed to a local variable
                ! just for readability of the code (from line 680)
-               csoilb = (vkc/(0.13_r8*(z0mg(c)*uaf(p)/1.5e-5_r8)**0.45_r8))
+               w%csoilb = (vkc/(0.13_r8*(z0mg(c)*uaf(p)/1.5e-5_r8)**0.45_r8))
                
                !compute the stability parameter for ricsoilc  ("S" in Sakaguchi&Zeng,2008)
 
-               ri = ( grav*htop(p) * (taf(p) - t_grnd(c)) ) / (taf(p) * uaf(p) **2.00_r8)
+               w%ri = ( grav*htop(p) * (w%taf - t_grnd(c)) ) / (w%taf * uaf(p) **2.00_r8)
                
                !! modify csoilc value (0.004) if the under-canopy is in stable condition
                
-               if ( (taf(p) - t_grnd(c) ) > 0._r8) then
+               if ( (w%taf - t_grnd(c) ) > 0._r8) then
                   ! decrease the value of csoilc by dividing it with (1+gamma*min(S, 10.0))
                   ! ria ("gmanna" in Sakaguchi&Zeng, 2008) is a constant (=0.5)
-                  ricsoilc = csoilc / (1.00_r8 + ria*min( ri, 10.0_r8) )
-                  csoilcn = csoilb*w + ricsoilc*(1._r8-w)
+                  w%ricsoilc = csoilc / (1.00_r8 + ria*min( w%ri, 10.0_r8) )
+                  w%csoilcn = w%csoilb*w%exp_ai + w%ricsoilc*(1._r8-w%exp_ai)
                else
-                  csoilcn = csoilb*w + csoilc*(1._r8-w)
+                  w%csoilcn = w%csoilb*w%exp_ai + csoilc*(1._r8-w%exp_ai)
                end if
 
                !! Sakaguchi changes for stability formulation ends here
 
-               rah(p,below_canopy) = 1._r8/(csoilcn*uaf(p))
-               raw(p,below_canopy) = rah(p,below_canopy)
+               w%rah(below_canopy) = 1._r8/(w%csoilcn*uaf(p))
+               w%raw(below_canopy) = w%rah(below_canopy)
                if (use_lch4) then
-                  grnd_ch4_cond(p) = 1._r8/(raw(p,above_canopy)+raw(p,below_canopy))
+                  grnd_ch4_cond(p) = 1._r8/(w%raw(above_canopy)+w%raw(below_canopy))
                end if
 
                ! Stomatal resistances for sunlit and shaded fractions of canopy.
                ! Done each iteration to account for differences in eah, tv.
                
-               svpts(p) = el(p)                         ! Pa
-               eah(p) = forc_pbot(t) * qaf(p) / mm_epsilon   ! Pa
-               rhaf(p) = eah(p)/svpts(p)
+               w%svpts = w%el                         ! Pa
+               w%eah = forc_pbot(t) * w%qaf / mm_epsilon   ! Pa
+               rhaf(p) = w%eah/w%svpts
                
                ! variables for history fields
-               rah_above(p)  = rah(p,above_canopy)
-               raw_above(p)  = raw(p,above_canopy)
-               rah_below(p)  = rah(p,below_canopy)
-               raw_below(p)  = raw(p,below_canopy)
-               vpd(p)        = max((svpts(p) - eah(p)), vpd_min) * pa_to_kpa ! kPa
+               rah_above(p)  = w%rah(above_canopy)
+               raw_above(p)  = w%raw(above_canopy)
+               rah_below(p)  = w%rah(below_canopy)
+               raw_below(p)  = w%raw(below_canopy)
+               vpd(p)        = max((w%svpts - w%eah), vpd_min) * pa_to_kpa ! kPa
                
                ! Modification for shrubs proposed by X.D.Z
                ! Equivalent modification for soy following AgroIBIS
@@ -923,61 +932,61 @@ contains
                end if
 
                if(do_b4b)then
-                  call WrapPhotosynthesis(bounds,p,svpts,eah,o2,co2,rb,dayl_factor, &
-                       btran,qsatl,qaf,atm2lnd_vars,canopystate_vars,photosyns_vars, &
+                  call WrapPhotosynthesis(bounds,p,[w%svpts],[w%eah],[w%o2],[w%co2],[w%rb],dayl_factor, &
+                       btran,[w%qsatl],[w%qaf],atm2lnd_vars,canopystate_vars,photosyns_vars, &
                        soilstate_vars, surfalb_vars,solarabs_vars,cnstate_vars,energyflux_vars)
                end if
                   
                ! Sensible heat conductance for air, leaf and ground
                ! Moved the original subroutine in-line...
 
-               wta    = 1._r8/rah(p,above_canopy)  ! air
-               wtl    = (elai(p)+esai(p))/rb(p)    ! leaf
-               wtg(p) = 1._r8/rah(p,below_canopy)  ! ground
-               wtshi  = 1._r8/(wta+wtl+wtg(p))
-               wtl0(p) = wtl*wtshi         ! leaf
-               wtg0    = wtg(p)*wtshi      ! ground
-               wta0(p) = wta*wtshi         ! air
+               w%wta    = 1._r8/w%rah(above_canopy)  ! air
+               w%wtl    = (elai(p)+esai(p))/w%rb    ! leaf
+               w%wtg = 1._r8/w%rah(below_canopy)  ! ground
+               w%wtshi  = 1._r8/(w%wta+w%wtl+w%wtg)
+               w%wtl0 = w%wtl*w%wtshi         ! leaf
+               w%wtg0    = w%wtg*w%wtshi      ! ground
+               w%wta0 = w%wta*w%wtshi         ! air
                
-               wtga    = wta0(p)+wtg0      ! ground + air
-               wtal(p) = wta0(p)+wtl0(p)   ! air + leaf
+               w%wtga    = w%wta0+w%wtg0      ! ground + air
+               w%wtal = w%wta0+w%wtl0   ! air + leaf
                
                ! Fraction of potential evaporation from leaf
 
                if (fdry(p) > 0._r8) then
-                  rppdry  = fdry(p)*rb(p)*(laisun(p)/(rb(p)+rssun(p)) + &
-                       laisha(p)/(rb(p)+rssha(p)))/elai(p)
+                  w%rppdry  = fdry(p)*w%rb*(laisun(p)/(w%rb+rssun(p)) + &
+                       laisha(p)/(w%rb+rssha(p)))/elai(p)
                else
-                  rppdry = 0._r8
+                  w%rppdry = 0._r8
                end if
 
                ! Calculate canopy conductance for methane / oxygen
                ! (e.g. stomatal conductance & leaf bdy cond)
                if (use_lch4) then
-                  canopy_cond(p) = (laisun(p)/(rb(p)+rssun(p)) + laisha(p) / &
-                       (rb(p)+rssha(p)))/max(elai(p), 0.01_r8)
+                  canopy_cond(p) = (laisun(p)/(w%rb+rssun(p)) + laisha(p) / &
+                       (w%rb+rssha(p)))/max(elai(p), 0.01_r8)
                end if
 
-               efpot = forc_rho(t)*wtl*(qsatl(p)-qaf(p))
+               w%efpot = forc_rho(t)*w%wtl*(w%qsatl-w%qaf)
                ! When the hydraulic stress parameterization is active calculate rpp
                ! but not transpiration
                if ( use_hydrstress ) then
-                  if (efpot > 0._r8) then
+                  if (w%efpot > 0._r8) then
                      if (btran(p) > btran0) then
-                        rpp = rppdry + fwet(p)
+                        w%rpp = w%rppdry + fwet(p)
                      else
-                        rpp = fwet(p)
+                        w%rpp = fwet(p)
                      end if
                      !Check total evapotranspiration from leaves
-                     rpp = min(rpp, (qflx_tran_veg(p)+h2ocan(p)/dtime)/efpot)
+                     w%rpp = min(w%rpp, (qflx_tran_veg(p)+h2ocan(p)/dtime)/w%efpot)
                   else
-                     rpp = 1._r8
+                     w%rpp = 1._r8
                   end if
                else
-                  if (efpot > 0._r8) then
+                  if (w%efpot > 0._r8) then
                      if (btran(p) > btran0) then
-                        qflx_tran_veg(p) = efpot*rppdry
-                        rpp = rppdry + fwet(p)
+                        qflx_tran_veg(p) = w%efpot*w%rppdry
+                        w%rpp = w%rppdry + fwet(p)
                      else
                         !No transpiration if btran below 1.e-10
                         rpp = fwet(p)
@@ -997,66 +1006,66 @@ contains
                ! Air has same conductance for both sensible and latent heat.
                ! Moved the original subroutine in-line...
 
-               wtaq    = frac_veg_nosno(p)/raw(p,above_canopy)             ! air
-               wtlq    = frac_veg_nosno(p)*(elai(p)+esai(p))/rb(p) * rpp   ! leaf
+               w%wtaq    = frac_veg_nosno(p)/raw(p,above_canopy)             ! air
+               w%wtlq    = frac_veg_nosno(p)*(elai(p)+esai(p))/rb(p) * rpp   ! leaf
 
                !Litter layer resistance. Added by K.Sakaguchi
-               snow_depth_c = z_dl ! critical depth for 100% litter burial by snow (=litter thickness)
-               fsno_dl = snow_depth(c)/snow_depth_c    ! effective snow cover for (dry)plant litter
-               elai_dl = lai_dl*(1._r8 - min(fsno_dl,1._r8)) ! exposed (dry)litter area index
-               rdl = ( 1._r8 - exp(-elai_dl) ) / ( 0.004_r8*uaf(p)) ! dry litter layer resistance
+               w%snow_depth_c = z_dl ! critical depth for 100% litter burial by snow (=litter thickness)
+               w%fsno_dl = snow_depth(c)/w%snow_depth_c    ! effective snow cover for (dry)plant litter
+               w%elai_dl = lai_dl*(1._r8 - min(w%fsno_dl,1._r8)) ! exposed (dry)litter area index
+               w%rdl = ( 1._r8 - exp(-w%elai_dl) ) / ( 0.004_r8*uaf(p)) ! dry litter layer resistance
                
                ! add litter resistance and Lee and Pielke 1992 beta
-               if (delq(p) < 0._r8) then  !dew. Do not apply beta for negative flux (follow old rsoil)
-                  wtgq(p) = frac_veg_nosno(p)/(raw(p,below_canopy)+rdl)
+               if (w%delq < 0._r8) then  !dew. Do not apply beta for negative flux (follow old rsoil)
+                  wtgq(p) = frac_veg_nosno(p)/(raw(p,below_canopy)+w%rdl)
                else
                   if (do_soilevap_beta()) then
-                     wtgq(p) = soilbeta(c)*frac_veg_nosno(p)/(raw(p,below_canopy)+rdl)
+                     wtgq(p) = soilbeta(c)*frac_veg_nosno(p)/(raw(p,below_canopy)+w%rdl)
                   endif
                end if
                
-               wtsqi   = 1._r8/(wtaq+wtlq+wtgq(p))
+               w%wtsqi   = 1._r8/(w%wtaq+w%wtlq+wtgq(p))
                
-               wtgq0    = wtgq(p)*wtsqi      ! ground
-               wtlq0(p) = wtlq*wtsqi         ! leaf
-               wtaq0(p) = wtaq*wtsqi         ! air
+               w%wtgq0    = wtgq(p)*w%wtsqi      ! ground
+               w%wtlq0 = w%wtlq*w%wtsqi         ! leaf
+               w%wtaq0 = w%wtaq*w%wtsqi         ! air
                
-               wtgaq    = wtaq0(p)+wtgq0     ! air + ground
-               wtalq(p) = wtaq0(p)+wtlq0(p)  ! air + leaf
+               w%wtgaq    = w%wtaq0+w%wtgq0     ! air + ground
+               w%wtalq = w%wtaq0+w%wtlq0  ! air + leaf
                
-               dc1 = forc_rho(t)*cpair*wtl
-               dc2 = hvap*forc_rho(t)*wtlq
+               w%dc1 = forc_rho(t)*cpair*w%wtl
+               w%dc2 = hvap*forc_rho(t)*w%wtlq
                
-               efsh   = dc1*(wtga*t_veg(p)-wtg0*t_grnd(c)-wta0(p)*thm(p))
-               efe(p) = dc2*(wtgaq*qsatl(p)-wtgq0*qg(c)-wtaq0(p)*forc_q(t))
+               w%efsh   = w%dc1*(w%wtga*t_veg(p)-w%wtg0*t_grnd(c)-w%wta0*thm(p))
+               w%efe = w%dc2*(w%wtgaq*w%qsatl-w%wtgq0*qg(c)-w%wtaq0*forc_q(t))
 
                ! Evaporation flux from foliage
-               erre = 0._r8
-               if (efe(p)*efeb(p) < 0._r8) then
-                  efeold = efe(p)
-                  efe(p)  = 0.1_r8*efeold
-                  erre = efe(p) - efeold
+               w%erre = 0._r8
+               if (w%efe*w%efeb < 0._r8) then
+                  w%efeold = w%efe
+                  w%efe  = 0.1_r8*w%efeold
+                  w%erre = w%efe - w%efeold
                end if
 
                ! fractionate ground emitted longwave
-               lw_grnd=(frac_sno(c)*t_soisno(c,snl(c)+1)**4 &
+               w%lw_grnd=(frac_sno(c)*t_soisno(c,snl(c)+1)**4 &
                     +(1._r8-frac_sno(c)-frac_h2osfc(c))*t_soisno(c,1)**4 &
                     +frac_h2osfc(c)*t_h2osfc(c)**4)
                
                dt_veg(p) = (sabv(p) + air(p) + bir(p)*t_veg(p)**4 + &
-                    cir(p)*lw_grnd - efsh - efe(p)) / &
-                    (- 4._r8*bir(p)*t_veg(p)**3 +dc1*wtga +dc2*wtgaq*qsatldT(p))
-               t_veg(p) = tlbef(p) + dt_veg(p)
-               dels = dt_veg(p)
-               del(p)  = abs(dels)
-               err(p) = 0._r8
-               if (del(p) > delmax) then
-                  dt_veg(p) = delmax*dels/del(p)
-                  t_veg(p) = tlbef(p) + dt_veg(p)
-                  err(p) = sabv(p) + air(p) + bir(p)*tlbef(p)**3*(tlbef(p) + &
-                       4._r8*dt_veg(p)) + cir(p)*lw_grnd - &
-                       (efsh + dc1*wtga*dt_veg(p)) - (efe(p) + &
-                       dc2*wtgaq*qsatldT(p)*dt_veg(p))
+                    cir(p)*w%lw_grnd - w%efsh - w%efe) / &
+                    (- 4._r8*bir(p)*t_veg(p)**3 +w%dc1*w%wtga +w%dc2*w%wtgaq*w%qsatldT)
+               t_veg(p) = w%tlbef + dt_veg(p)
+               w%dels = dt_veg(p)
+               w%del  = abs(w%dels)
+               w%err = 0._r8
+               if (w%del > delmax) then
+                  dt_veg(p) = delmax*w%dels/w%del
+                  t_veg(p) = w%tlbef + dt_veg(p)
+                  w%err = sabv(p) + air(p) + bir(p)*w%tlbef**3*(w%tlbef + &
+                       4._r8*dt_veg(p)) + cir(p)*w%lw_grnd - &
+                       (w%efsh + w%dc1*w%wtga*dt_veg(p)) - (w%efe + &
+                       w%dc2*w%wtgaq*w%qsatldT*dt_veg(p))
                end if
                
                ! Fluxes from leaves to canopy space
@@ -1064,9 +1073,9 @@ contains
                ! result in an imbalance in "hvap*qflx_evap_veg" and
                ! "efe + dc2*wtgaq*qsatdt_veg"
                
-               efpot = forc_rho(t)*wtl*(wtgaq*(qsatl(p)+qsatldT(p)*dt_veg(p)) &
-                    -wtgq0*qg(c)-wtaq0(p)*forc_q(t))
-               qflx_evap_veg(p) = rpp*efpot
+               w%efpot = forc_rho(t)*w%wtl*(w%wtgaq*(w%qsatl+w%qsatldT*dt_veg(p)) &
+                    -w%wtgq0*qg(c)-w%wtaq0*forc_q(t))
+               qflx_evap_veg(p) = rpp*w%efpot
                
                ! Calculation of evaporative potentials (efpot) and
                ! interception losses; flux in kg m**-2 s-1.  ecidif
@@ -1074,67 +1083,67 @@ contains
                ! during the timestep.  This energy is later added to the
                ! sensible heat flux.
                if ( use_hydrstress ) then
-                  ecidif = max(0._r8,qflx_evap_veg(p)-qflx_tran_veg(p)-h2ocan(p)/dtime)
+                  w%ecidif = max(0._r8,qflx_evap_veg(p)-qflx_tran_veg(p)-h2ocan(p)/dtime)
                   qflx_evap_veg(p) = min(qflx_evap_veg(p),qflx_tran_veg(p)+h2ocan(p)/dtime)
                else
                   
-                  ecidif = 0._r8
-                  if (efpot > 0._r8 .and. btran(p) > btran0) then
-                     qflx_tran_veg(p) = efpot*rppdry
+                  w%ecidif = 0._r8
+                  if (w%efpot > 0._r8 .and. btran(p) > btran0) then
+                     qflx_tran_veg(p) = w%efpot*rppdry
                   else
                      qflx_tran_veg(p) = 0._r8
                   end if
-                  ecidif = max(0._r8, qflx_evap_veg(p)-qflx_tran_veg(p)-h2ocan(p)/dtime)
+                  w%ecidif = max(0._r8, qflx_evap_veg(p)-qflx_tran_veg(p)-h2ocan(p)/dtime)
                   qflx_evap_veg(p) = min(qflx_evap_veg(p),qflx_tran_veg(p)+h2ocan(p)/dtime)
                end if
 
                ! The energy loss due to above two limits is added to
                ! the sensible heat flux.
-               eflx_sh_veg(p) = efsh + dc1*wtga*dt_veg(p) + err(p) + erre + hvap*ecidif
+               eflx_sh_veg(p) = w%efsh + w%dc1*w%wtga*dt_veg(p) + w%err + w%erre + hvap*w%ecidif
                
                ! Re-calculate saturated vapor pressure, specific humidity, and their
                ! derivatives at the leaf surface
                
-               call QSat(t_veg(p), forc_pbot(t), el(p), deldT, qsatl(p), qsatldT(p))
+               call QSat(t_veg(p), forc_pbot(t), w%el, w%deldT, w%qsatl, w%qsatldT)
                
                ! Update vegetation/ground surface temperature, canopy air
                ! temperature, canopy vapor pressure, aerodynamic temperature, and
                ! Monin-Obukhov stability parameter for next iteration.
                
-               taf(p) = wtg0*t_grnd(c) + wta0(p)*thm(p) + wtl0(p)*t_veg(p)
-               qaf(p) = wtlq0(p)*qsatl(p) + wtgq0*qg(c) + forc_q(t)*wtaq0(p)
+               w%taf = w%wtg0*t_grnd(c) + w%wta0*thm(p) + w%wtl0*t_veg(p)
+               w%qaf = w%wtlq0*w%qsatl + w%wtgq0*qg(c) + forc_q(t)*w%wtaq0
                
                ! Update Obukhov length scale and wind speed including the
                ! stability effect
                
-               dth(p) = thm(p)-taf(p)
-               dqh(p) = forc_q(t)-qaf(p)
-               delq(p) = wtalq(p)*qg(c)-wtlq0(p)*qsatl(p)-wtaq0(p)*forc_q(t)
+               w%dth = thm(p)-w%taf
+               w%dqh = forc_q(t)-w%qaf
+               w%delq = w%wtalq*qg(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
                
-               tstar = temp1(p)*dth(p)
-               qstar = temp2(p)*dqh(p)
+               w%tstar = w%temp1*w%dth
+               w%qstar = w%temp2*w%dqh
                
-               thvstar = tstar*(1._r8+0.61_r8*forc_q(t)) + 0.61_r8*forc_th(t)*qstar
-               zeta(p) = zldis(p)*vkc*grav*thvstar/(ustar(p)**2*thv(c))
+               w%thvstar = w%tstar*(1._r8+0.61_r8*forc_q(t)) + 0.61_r8*forc_th(t)*w%qstar
+               zeta(p) = zldis(p)*vkc*grav*w%thvstar/(w%ustar**2*thv(c))
                
                if (zeta(p) >= 0._r8) then     !stable
                   zeta(p) = min(2._r8,max(zeta(p),0.01_r8))
-                  um(p) = max(ur(p),0.1_r8)
+                  um(p) = max(w%ur,0.1_r8)
                else                     !unstable
                   zeta(p) = max(-100._r8,min(zeta(p),-0.01_r8))
                   if ((.not. atm_gustiness) .or. force_land_gustiness) then
-                     wc = beta*(-grav*ustar(p)*thvstar*zii/thv(c))**0.333_r8
-                     ugust_total(p) = sqrt(ugust(t)**2 + wc**2)
-                     um(p) = sqrt(ur(p)*ur(p)+wc*wc)
+                     w%wc = beta*(-grav*w%ustar*w%thvstar*zii/thv(c))**0.333_r8
+                     ugust_total(p) = sqrt(ugust(t)**2 + w%wc**2)
+                     um(p) = sqrt(w%ur*w%ur+w%wc*w%wc)
                   else
-                     um(p) = max(ur(p),0.1_r8)
+                     um(p) = max(w%ur,0.1_r8)
                   end if
                end if
                obu(p) = zldis(p)/zeta(p)
 
-               if (obuold(p)*obu(p) < 0._r8) nmozsgn(p) = nmozsgn(p)+1
-               if (nmozsgn(p) >= 4) obu(p) = zldis(p)/(-0.01_r8)
-               obuold(p) = obu(p)
+               if (w%obuold*obu(p) < 0._r8) w%nmozsgn = w%nmozsgn+1
+               if (w%nmozsgn >= 4) obu(p) = zldis(p)/(-0.01_r8)
+               w%obuold = obu(p)
 
                ! laminar boundary resistance for h2o over leaf,
                ! should I make this consistent for latent heat calculation?
@@ -1144,13 +1153,13 @@ contains
                iter_final = itlef
                itlef = itlef+1
                
-               dele(p) = abs(efe(p)-efeb(p))
-               efeb(p) = efe(p)
-               det(p)  = max(del(p),del2(p))
+               w%dele = abs(w%efe-w%efeb)
+               w%efeb = w%efe
+               w%det  = max(w%del,w%del2)
                num_iter(p) = real(itlef,r8)
                
-               if ( (.not. (det(p) < dtmin .and. dele(p) < dlemin) .or. &
-                    (implicit_stress .and. abs(tau_diff(p)) >= dtaumin)) .and. &
+               if ( (.not. (w%det < dtmin .and. w%dele < dlemin) .or. &
+                    (implicit_stress .and. abs(w%tau_diff) >= dtaumin)) .and. &
                     (itlef < itmax)) then
                   converge_tveg = .false.
                else
@@ -1173,11 +1182,11 @@ contains
             !reldel_rs = 2._r8*max( abs(rssun(p)-rssun_old(p))/(rssun(p)+rssun_old(p)), &
             !     abs(rssha(p)-rssha_old(p))/(rssha(p)+rssha_old(p)) )
             
-            del_gs = max( abs(1._r8/rssun(p)-1._r8/rssun_old(p)), &
-                          abs(1._r8/rssha(p)-1._r8/rssha_old(p)) )
+            w%del_gs = max( abs(1._r8/rssun(p)-1._r8/w%rssun_old), &
+                          abs(1._r8/rssha(p)-1._r8/w%rssha_old) )
 
             istoma_converge_if: if( do_b4b .or. &
-                                    (del_gs < max_del_gs ) .or.  &
+                                    (w%del_gs < max_del_gs ) .or.  &
                                     (itstoma>=itmax_stomata) ) then
                converge_stoma = .true.
                
@@ -1188,8 +1197,8 @@ contains
                num_iter(p) = num_iter(p) + 1
                
                ! Update the previous resistances
-               rssun_old(p) = rssun(p)
-               rssha_old(p) = rssha(p)
+               w%rssun_old = rssun(p)
+               w%rssha_old = rssha(p)
 
                ! Call photosynthesis and retrieve
                ! updated stomatal conductances
@@ -1199,95 +1208,86 @@ contains
                ! as constant during this inner loop (tveg) iteration
 
                call WrapPhotosynthesis(bounds,p,svpts,eah,o2,co2,rb,dayl_factor, &
-                    btran,qsatl,qaf,atm2lnd_vars,canopystate_vars,photosyns_vars, &
+                    btran,[w%qsatl],[w%qaf],atm2lnd_vars,canopystate_vars,photosyns_vars, &
                     soilstate_vars, surfalb_vars,solarabs_vars,cnstate_vars,energyflux_vars)
                
             end if istoma_converge_if
 
          end do iterate_stoma
          
-      end do patch_loop1
-      !$OMP END PARALLEL DO
-      call t_stop_lnd(event)
-
-      do f = 1, fn
-         p = filterp(f)
-         c = veg_pp%column(p)
-         t = veg_pp%topounit(p)
-         g = veg_pp%gridcell(p)
 
          ! Energy balance check in canopy
 
-         lw_grnd=(frac_sno(c)*t_soisno(c,snl(c)+1)**4 &
+         w%lw_grnd=(frac_sno(c)*t_soisno(c,snl(c)+1)**4 &
               +(1._r8-frac_sno(c)-frac_h2osfc(c))*t_soisno(c,1)**4 &
               +frac_h2osfc(c)*t_h2osfc(c)**4)
 
-         err(p) = sabv(p) + air(p) + bir(p)*tlbef(p)**3*(tlbef(p) + 4._r8*dt_veg(p)) &
+         w%err = sabv(p) + air(p) + bir(p)*w%tlbef**3*(w%tlbef + 4._r8*dt_veg(p)) &
                                 !+ cir(p)*t_grnd(c)**4 - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
-              + cir(p)*lw_grnd - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
+              + cir(p)*w%lw_grnd - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
 
          ! Fluxes from ground to canopy space
 
-         delt    = wtal(p)*t_grnd(c)-wtl0(p)*t_veg(p)-wta0(p)*thm(p)
+         w%delt    = w%wtal*t_grnd(c)-w%wtl0*t_veg(p)-w%wta0*thm(p)
          taux(p) = -forc_rho(t)*forc_u(t)/ram1(p)
          tauy(p) = -forc_rho(t)*forc_v(t)/ram1(p)
          if (implicit_stress) then
-            taux(p) = taux(p) * (wind_speed_adj(p) / wind_speed0(p))
-            tauy(p) = tauy(p) * (wind_speed_adj(p) / wind_speed0(p))
+            taux(p) = taux(p) * (w%wind_speed_adj / w%wind_speed0)
+            tauy(p) = tauy(p) * (w%wind_speed_adj / w%wind_speed0)
          end if
-         eflx_sh_grnd(p) = cpair*forc_rho(t)*wtg(p)*delt
+         eflx_sh_grnd(p) = cpair*forc_rho(t)*wtg(p)*w%delt
 
          ! compute individual sensible heat fluxes
-         delt_snow = wtal(p)*t_soisno(c,snl(c)+1)-wtl0(p)*t_veg(p)-wta0(p)*thm(p)
-         eflx_sh_snow(p) = cpair*forc_rho(t)*wtg(p)*delt_snow
+         w%delt_snow = w%wtal*t_soisno(c,snl(c)+1)-w%wtl0*t_veg(p)-w%wta0*thm(p)
+         eflx_sh_snow(p) = cpair*forc_rho(t)*wtg(p)*w%delt_snow
 
-         delt_soil  = wtal(p)*t_soisno(c,1)-wtl0(p)*t_veg(p)-wta0(p)*thm(p)
-         eflx_sh_soil(p) = cpair*forc_rho(t)*wtg(p)*delt_soil
+         w%delt_soil  = w%wtal*t_soisno(c,1)-w%wtl0*t_veg(p)-w%wta0*thm(p)
+         eflx_sh_soil(p) = cpair*forc_rho(t)*wtg(p)*w%delt_soil
 
-         delt_h2osfc  = wtal(p)*t_h2osfc(c)-wtl0(p)*t_veg(p)-wta0(p)*thm(p)
-         eflx_sh_h2osfc(p) = cpair*forc_rho(t)*wtg(p)*delt_h2osfc
-         qflx_evap_soi(p) = forc_rho(t)*wtgq(p)*delq(p)
+         w%delt_h2osfc  = w%wtal*t_h2osfc(c)-w%wtl0*t_veg(p)-w%wta0*thm(p)
+         eflx_sh_h2osfc(p) = cpair*forc_rho(t)*wtg(p)*w%delt_h2osfc
+         qflx_evap_soi(p) = forc_rho(t)*wtgq(p)*w%delq
 
          ! compute individual latent heat fluxes
-         delq_snow = wtalq(p)*qg_snow(c)-wtlq0(p)*qsatl(p)-wtaq0(p)*forc_q(t)
-         qflx_ev_snow(p) = forc_rho(t)*wtgq(p)*delq_snow
+         w%delq_snow = w%wtalq*qg_snow(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
+         qflx_ev_snow(p) = forc_rho(t)*wtgq(p)*w%delq_snow
 
-         delq_soil = wtalq(p)*qg_soil(c)-wtlq0(p)*qsatl(p)-wtaq0(p)*forc_q(t)
-         qflx_ev_soil(p) = forc_rho(t)*wtgq(p)*delq_soil
+         w%delq_soil = w%wtalq*qg_soil(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
+         qflx_ev_soil(p) = forc_rho(t)*wtgq(p)*w%delq_soil
 
-         delq_h2osfc = wtalq(p)*qg_h2osfc(c)-wtlq0(p)*qsatl(p)-wtaq0(p)*forc_q(t)
-         qflx_ev_h2osfc(p) = forc_rho(t)*wtgq(p)*delq_h2osfc
+         w%delq_h2osfc = w%wtalq*qg_h2osfc(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
+         qflx_ev_h2osfc(p) = forc_rho(t)*wtgq(p)*w%delq_h2osfc
 
          ! 2 m height air temperature
 
-         t_ref2m(p) = thm(p) + temp1(p)*dth(p)*(1._r8/temp12m(p) - 1._r8/temp1(p))
+         t_ref2m(p) = thm(p) + w%temp1*w%dth*(1._r8/w%temp12m - 1._r8/w%temp1)
          t_ref2m_r(p) = t_ref2m(p)
 
          ! 2 m height specific humidity
 
-         q_ref2m(p) = forc_q(t) + temp2(p)*dqh(p)*(1._r8/temp22m(p) - 1._r8/temp2(p))
+         q_ref2m(p) = forc_q(t) + w%temp2*w%dqh*(1._r8/w%temp22m - 1._r8/w%temp2)
 
          ! 2 m height relative humidity
 
-         call QSat(t_ref2m(p), forc_pbot(t), e_ref2m, de2mdT, qsat_ref2m, dqsat2mdT)
-         rh_ref2m(p) = min(100._r8, q_ref2m(p) / qsat_ref2m * 100._r8)
+         call QSat(t_ref2m(p), forc_pbot(t), w%e_ref2m, w%de2mdT, w%qsat_ref2m, w%dqsat2mdT)
+         rh_ref2m(p) = min(100._r8, q_ref2m(p) / w%qsat_ref2m * 100._r8)
          rh_ref2m_r(p) = rh_ref2m(p)
 
          ! Downward longwave radiation below the canopy
 
          dlrad(p) = (1._r8-emv(p))*emg(c)*forc_lwrad(t) + &
-              emv(p)*emg(c)*sb*tlbef(p)**3*(tlbef(p) + 4._r8*dt_veg(p))
+              emv(p)*emg(c)*sb*w%tlbef**3*(w%tlbef + 4._r8*dt_veg(p))
 
          ! Upward longwave radiation above the canopy
 
          ulrad(p) = ((1._r8-emg(c))*(1._r8-emv(p))*(1._r8-emv(p))*forc_lwrad(t) &
-              + emv(p)*(1._r8+(1._r8-emg(c))*(1._r8-emv(p)))*sb*tlbef(p)**3*(tlbef(p) + &
-              4._r8*dt_veg(p)) + emg(c)*(1._r8-emv(p))*sb*lw_grnd)
+              + emv(p)*(1._r8+(1._r8-emg(c))*(1._r8-emv(p)))*sb*w%tlbef**3*(w%tlbef + &
+              4._r8*dt_veg(p)) + emg(c)*(1._r8-emv(p))*sb*w%lw_grnd)
 
          ! Derivative of soil energy flux with respect to soil temperature
 
-         cgrnds(p) = cgrnds(p) + cpair*forc_rho(t)*wtg(p)*wtal(p)
-         cgrndl(p) = cgrndl(p) + forc_rho(t)*wtgq(p)*wtalq(p)*dqgdT(c)
+         cgrnds(p) = cgrnds(p) + cpair*forc_rho(t)*wtg(p)*w%wtal
+         cgrndl(p) = cgrndl(p) + forc_rho(t)*wtgq(p)*w%wtalq*dqgdT(c)
          cgrnd(p)  = cgrnds(p) + cgrndl(p)*htvp(c)
 
          ! Update dew accumulation (kg/m2)
@@ -1295,16 +1295,35 @@ contains
          h2ocan(p) = max(0._r8,h2ocan(p)+(qflx_tran_veg(p)-qflx_evap_veg(p))*dtime)
 
          ! Check for convergence of stress.
-         if (implicit_stress .and. abs(tau_diff(p)) > dtaumin) then
+         if (implicit_stress .and. abs(w%tau_diff) > dtaumin) then
             if (nstep_mod > 0) then ! Suppress common warnings on the first time step.
                write(iulog,*)'WARNING: Stress did not converge for canopy ',&
-                    ' nstep = ',nstep_mod,' p= ',p,' prev_tau_diff= ',prev_tau_diff(p),&
-                    ' tau_diff= ',tau_diff(p),' tau= ',tau(p),&
-                    ' wind_speed_adj= ',wind_speed_adj(p),' iter_final= ',iter_final
+                    ' nstep = ',nstep_mod,' p= ',p,' prev_tau_diff= ',w%prev_tau_diff,&
+                    ' tau_diff= ',w%tau_diff,' tau= ',w%tau,&
+                    ' wind_speed_adj= ',w%wind_speed_adj,' iter_final= ',iter_final
             end if
          end if
 
+         ! Copy back values needed after loop
+         err(p) = w%err
+         zldis(p) = w%zldis
+
+      end do do_patch
+      !$OMP END PARALLEL DO
+
+      ! Check if forcing height is below canopy height for any patch
+      do f = 1, fn
+         p = filterp(f)
+         if (zldis(p) < 0._r8) then
+            if ( .not. use_fates ) then
+#ifndef _OPENACC
+            write(iulog,*)'Error: Forcing height is below canopy height for pft index '
+            call endrun(decomp_index=index, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
+#endif
+         end if
       end do
+
+      call t_stop_lnd(event)
 
       if ( use_fates ) then
 
