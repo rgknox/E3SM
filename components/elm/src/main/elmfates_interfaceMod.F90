@@ -2714,12 +2714,12 @@ contains
     class(hlm_fates_interface_type), intent(inout) :: this
     type(bounds_type)      , intent(in)            :: bounds_clump
     integer                , intent(in)            :: p                ! patch of interest
-    real(r8)               , intent(in)            :: esat_tv(bounds_clump%begp: )      ! saturation vapor pressure at t_veg (Pa)
-    real(r8)               , intent(in)            :: eair( bounds_clump%begp: )        ! vapor pressure of canopy air (Pa)
-    real(r8)               , intent(in)            :: oair( bounds_clump%begp: )        ! Atmospheric O2 partial pressure (Pa)
-    real(r8)               , intent(in)            :: cair( bounds_clump%begp: )        ! Atmospheric CO2 partial pressure (Pa)
-    real(r8)               , intent(in)            :: rb( bounds_clump%begp: )          ! boundary layer resistance (s/m)
-    real(r8)               , intent(in)            :: dayl_factor( bounds_clump%begp: ) ! scalar (0-1) for daylength
+    real(r8)               , intent(in)            :: esat_tv      ! saturation vapor pressure at t_veg (Pa)
+    real(r8)               , intent(in)            :: eair         ! vapor pressure of canopy air (Pa)
+    real(r8)               , intent(in)            :: oair         ! Atmospheric O2 partial pressure (Pa)
+    real(r8)               , intent(in)            :: cair         ! Atmospheric CO2 partial pressure (Pa)
+    real(r8)               , intent(in)            :: rb           ! boundary layer resistance (s/m)
+    real(r8)               , intent(in)            :: dayl_factor  ! scalar (0-1) for daylength
     type(atm2lnd_type)     , intent(in)            :: atm2lnd_inst
     type(canopystate_type) , intent(inout)         :: canopystate_inst
     type(photosyns_type)   , intent(inout)         :: photosyns_inst
@@ -2750,14 +2750,14 @@ contains
       nlevsoil = this%fates(nc)%bc_in(s)%nlevsoil
       this%fates(nc)%bc_in(s)%t_soisno_sl(1:nlevsoil) = t_soisno(c,1:nlevsoil)  ! soil temperature (Kelvin)
       this%fates(nc)%bc_in(s)%forc_pbot               = forc_pbot(t)            ! atmospheric pressure (Pa)
-      this%fates(nc)%bc_in(s)%dayl_factor_pa(ifp) = dayl_factor(p) ! scalar (0-1) for daylength
-      this%fates(nc)%bc_in(s)%oair_pa(ifp)        = oair(p)        ! Atmospheric O2 partial pressure (Pa)
-      this%fates(nc)%bc_in(s)%cair_pa(ifp)        = cair(p)        ! Atmospheric CO2 partial pressure (Pa)
+      this%fates(nc)%bc_in(s)%dayl_factor_pa(ifp) = dayl_factor ! scalar (0-1) for daylength
+      this%fates(nc)%bc_in(s)%oair_pa(ifp)        = oair        ! Atmospheric O2 partial pressure (Pa)
+      this%fates(nc)%bc_in(s)%cair_pa(ifp)        = cair        ! Atmospheric CO2 partial pressure (Pa)
       
       ! These probably all dynamically respond to the LEB calculation
-      this%fates(nc)%bc_in(s)%esat_tv_pa(ifp)     = esat_tv(p)     ! saturation vapor pressure at t_veg (Pa)
-      this%fates(nc)%bc_in(s)%eair_pa(ifp)        = eair(p)        ! vapor pressure of canopy air (Pa)
-      this%fates(nc)%bc_in(s)%rb_pa(ifp)          = rb(p)          ! boundary layer resistance (s/m)
+      this%fates(nc)%bc_in(s)%esat_tv_pa(ifp)     = esat_tv     ! saturation vapor pressure at t_veg (Pa)
+      this%fates(nc)%bc_in(s)%eair_pa(ifp)        = eair        ! vapor pressure of canopy air (Pa)
+      this%fates(nc)%bc_in(s)%rb_pa(ifp)          = rb          ! boundary layer resistance (s/m)
       this%fates(nc)%bc_in(s)%t_veg_pa(ifp)       = t_veg(p)       ! vegetation temperature (Kelvin)
       this%fates(nc)%bc_in(s)%tgcm_pa(ifp)        = tgcm(p)        ! air temperature at agcm
 

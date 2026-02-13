@@ -43,7 +43,8 @@ module CanopyFluxesMod
   use VegetationType        , only : veg_pp
   use VegetationDataType    , only : veg_es, veg_ef, veg_ws, veg_wf
 
-  !!! using elm_instMod messes with the compilation order
+!!! using elm_instMod messes with the compilation order
+  use FrictionVelocityMod, only : FrictionVelocity
   use elm_instMod           , only : alm_fates, soil_water_retention_curve
   use TemperatureType , only : temperature_vars
   use perfMod_GPU
@@ -71,7 +72,8 @@ module CanopyFluxesMod
      real(r8) :: dqh                ! diff of humidity between ref. height and surface
      real(r8) :: ur                 ! wind speed at reference height [m/s]
      real(r8) :: wc                 ! convective velocity [m/s]
-     
+     real(r8) :: dayl_factor        ! scalar (0-1) for daylength effect on Vcmax
+
      ! Temperature and humidity profiles
      real(r8) :: temp1              ! relation for potential temperature profile
      real(r8) :: temp12m            ! relation for potential temperature profile applied at 2-m
@@ -123,7 +125,7 @@ module CanopyFluxesMod
      real(r8) :: dqsat2mdT          ! derivative of 2 m height surface saturated specific humidity on t_ref2m
      real(r8) :: svpts              ! saturation vapor pressure at t_veg (pa)
      real(r8) :: eah                ! canopy air vapor pressure (pa)
-     
+
      ! Radiation terms
      real(r8) :: air                ! atmos. radiation temporary set
      real(r8) :: bir                ! atmos. radiation temporary set
@@ -161,11 +163,6 @@ module CanopyFluxesMod
      real(r8) :: ecidif             ! excess energies [W/m2]
      real(r8) :: erre               ! balance error
      
-     ! Atmospheric composition
-     real(r8) :: co2                ! atmospheric co2 partial pressure (pa)
-     real(r8) :: c13o2              ! atmospheric c13o2 partial pressure (pa)
-     real(r8) :: o2                 ! atmospheric o2 partial pressure (pa)
-     
      ! Stomatal resistance (for convergence checking)
      real(r8) :: rssun_old          ! previous sunlit stomatal resistance (s/m)
      real(r8) :: rssha_old          ! previous shaded stomatal resistance (s/m)
@@ -191,16 +188,6 @@ module CanopyFluxesMod
      real(r8) :: elai_dl            ! exposed (dry) plant litter area index
      real(r8) :: fsno_dl            ! effective snow cover over plant litter
      
-     ! Soil moisture and root properties
-     real(r8) :: s_node             ! vol_liq/eff_porosity
-     real(r8) :: smp_node           ! matrix potential
-     real(r8) :: smp_node_lf        ! F. Li and S. Levis
-     real(r8) :: vol_liq            ! partial volume of liquid water in layer
-     real(r8) :: vol_liq_so         ! partial volume of liquid water for smp_node = smpso
-     real(r8) :: h2osoi_liq_so      ! liquid water corresponding to vol_liq_so [kg/m2]
-     real(r8) :: h2osoi_liq_sat     ! liquid water at eff_porosity [kg/m2]
-     real(r8) :: deficit            ! soil moisture deficit [kg/m2]
-     
      ! Wind stress (implicit coupling)
      real(r8) :: wind_speed0        ! wind speed from atmosphere at start of iteration
      real(r8) :: wind_speed_adj     ! adjusted wind speed for iteration
@@ -216,6 +203,8 @@ module CanopyFluxesMod
      logical  :: converge_stoma     ! stomatal convergence flag
      logical  :: converge_tveg      ! temperature convergence flag
      real(r8) :: del_gs             ! max difference in stomatal conductance [m/s]
+
+     real(r8) :: err                ! balance error
   end type worker_type
 
 contains
@@ -266,7 +255,7 @@ contains
     use elm_varsur         , only : firrig
     use TopounitType       , only : top_pp
     use QSatMod            , only : QSat
-    use FrictionVelocityMod, only : FrictionVelocity, MoninObukIni, &
+    use FrictionVelocityMod, only : MoninObukIni, &
          implicit_stress, atm_gustiness, force_land_gustiness
     use SoilWaterRetentionCurveMod, only : soil_water_retention_curve_type
     use SurfaceResistanceMod, only : getlblcef
@@ -331,11 +320,11 @@ contains
     ! Arrays that remain (used before/after loop or need to persist)
     real(r8) :: zldis(bounds%begp:bounds%endp)       ! reference height "minus" zero displacement height [m]
     real(r8) :: err(bounds%begp:bounds%endp)         ! balance error
-    real(r8) :: dayl_factor(bounds%begp:bounds%endp) ! scalar (0-1) for daylength effect on Vcmax
+    
     real(r8) :: dt_veg(bounds%begp:bounds%endp)      ! change in t_veg, last iteration (Kelvin)
     logical  :: check_for_irrig(bounds%begp:bounds%endp) ! where do we need to check soil moisture to see if we need to irrigate?
     logical  :: frozen_soil(bounds%begp:bounds%endp)     ! set to true if we have encountered a frozen soil layer
-    
+
     ! Scalars and indices
     real(r8) :: cf_bare                              ! heat transfer coefficient from bare ground [-]
     integer  :: j                                    ! soil/snow level index
@@ -362,6 +351,12 @@ contains
     real(r8) :: temprootr
     integer  :: iv
 
+    real(r8) :: deficit            ! soil moisture deficit [kg/m2]
+    real(r8) :: vol_liq_so         ! partial volume of liquid water for smp_node = smpso
+    real(r8) :: h2osoi_liq_so      ! liquid water corresponding to vol_liq_so [kg/m2]
+    real(r8) :: h2osoi_liq_sat     ! liquid water at eff_porosity [kg/m2]
+
+    
     character(len=64) :: event !! timing event
     
     ! Worker type for patch-level temporary variables
@@ -402,7 +397,6 @@ contains
          tau_est              => top_as%tau_est                            , & ! Input:  [real(r8) (:)   ]  approximate atmosphere change to zonal wind (m/s)
          ugust                => top_as%ugust                              , & ! Input:  [real(r8) (:)   ]  gustiness from atmosphere (m/s)
          forc_pco2            => top_as%pco2bot                            , & ! Input:  [real(r8) (:)   ]  partial pressure co2 (Pa)                                             
-         forc_pc13o2          => top_as%pc13o2bot                          , & ! Input:  [real(r8) (:)   ]  partial pressure c13o2 (Pa)                                           
          forc_po2             => top_as%po2bot                             , & ! Input:  [real(r8) (:)   ]  partial pressure o2 (Pa)                                              
 
          dleaf                => veg_vp%dleaf                          , & ! Input:  [real(r8) (:)   ]  characteristic leaf dimension (m)
@@ -575,15 +569,6 @@ contains
       end if
 #endif
 
-      ! calculate daylength control for Vcmax
-      do f = 1, fn
-         p=filterp(f)
-         g=veg_pp%gridcell(p)
-         ! calculate dayl_factor as the ratio of (current:max dayl)^2
-         ! set a minimum of 0.01 (1%) for the dayl_factor
-         dayl_factor(p)=min(1._r8,max(0.01_r8,(dayl(g)*dayl(g))/(max_dayl(g)*max_dayl(g))))
-      end do
-
       rb1(begp:endp) = 0._r8
       !assign the temporary filter
       do f = 1, fn
@@ -718,18 +703,18 @@ contains
          end do        ! do f
       end do           ! do j
 
+      
       event = 'can_iter'
       call t_start_lnd(event)
-
       
       ! Use adaptive scheduling based on workload variability:
       ! - FATES: dynamic(1) for highly variable photosynthesis costs
       ! - Non-FATES: guided for lower overhead with more uniform work
-      if (use_fates) then
-         !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(DYNAMIC, 1)
-      else
-         !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(GUIDED)
-      end if
+      !if (use_fates) then
+      !$OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(DYNAMIC, 1) if (use_fates)
+      !else
+      !  OMP PARALLEL DO PRIVATE (f,p,c,t,g,w) SCHEDULE(GUIDED)
+      !end if
 
       do_patch: do f = 1, fn
          p = filterp(f)
@@ -767,15 +752,6 @@ contains
 
          call QSat (t_veg(p), forc_pbot(t), w%el, w%deldT, w%qsatl, w%qsatldT)
 
-         ! Determine atmospheric co2 and o2
-
-         w%co2 = forc_pco2(t)
-         w%o2  = forc_po2(t)
-
-         if ( use_c13 ) then
-            w%c13o2 = forc_pc13o2(t)
-         end if
-
          ! Initialize flux profile
 
          w%taf = (t_grnd(c) + thm(p))/2._r8
@@ -801,7 +777,7 @@ contains
          zldis(p) = forc_hgt_u_patch(p) - displa(p)
 
          ! Initialize Obukhov length scale and wind speed
-         call MoninObukIni([w%ur], thv(c), [w%dthv], [zldis(p)], [z0mv(p)], [um(p)], [obu(p)])
+         call MoninObukIni(w%ur, thv(c), w%dthv, zldis(p), z0mv(p), um(p), obu(p))
          
          num_iter(p) = 0
          !rssun(p) is carried over from previous time-step
@@ -826,10 +802,10 @@ contains
             
                ! Determine friction velocity, and potential temperature and humidity
                ! profiles of the surface boundary layer
-               call FrictionVelocity (begp, endp, 1, [p], &
-                    [displa(p)], [z0mv(p)], [z0hv(p)], [z0qv(p)], &
-                    [obu(p)], w%itlef, [w%ur], [um(p)], [w%ugust_total], [ustar(p)], &
-                    [w%temp1], [w%temp2], [w%temp12m], [w%temp22m], [w%fm], &
+               call FrictionVelocityPatch (begp, endp, p, &
+                    displa(p), z0mv(p), z0hv(p), z0qv(p), &
+                    obu(p), w%itlef, w%ur, um(p), w%ugust_total, ustar(p), &
+                    w%temp1, w%temp2, w%temp12m, w%temp22m, w%fm, &
                     frictionvel_vars)
                
                w%tlbef = t_veg(p)
@@ -931,9 +907,11 @@ contains
                   end if
                end if
 
+               w%dayl_factor =min(1._r8,max(0.01_r8,(dayl(g)*dayl(g))/(max_dayl(g)*max_dayl(g))))
+               
                if(do_b4b)then
-                  call WrapPhotosynthesis(bounds,p,[w%svpts],[w%eah],[w%o2],[w%co2],[w%rb],dayl_factor, &
-                       btran,[w%qsatl],[w%qaf],atm2lnd_vars,canopystate_vars,photosyns_vars, &
+                  call WrapPhotosynthesis(bounds,p,w%svpts,w%eah,forc_po2(t),forc_pco2(t),w%rb,w%dayl_factor, &
+                       btran(p),w%qsatl,w%qaf,atm2lnd_vars,canopystate_vars,photosyns_vars, &
                        soilstate_vars, surfalb_vars,solarabs_vars,cnstate_vars,energyflux_vars)
                end if
                   
@@ -989,14 +967,14 @@ contains
                         w%rpp = w%rppdry + fwet(p)
                      else
                         !No transpiration if btran below 1.e-10
-                        rpp = fwet(p)
+                        w%rpp = fwet(p)
                         qflx_tran_veg(p) = 0._r8
                      end if
                      !Check total evapotranspiration from leaves
-                     rpp = min(rpp, (qflx_tran_veg(p)+h2ocan(p)/dtime)/efpot)
+                     w%rpp = min(w%rpp, (qflx_tran_veg(p)+h2ocan(p)/dtime)/w%efpot)
                   else
                      !No transpiration if potential evaporation less than zero
-                     rpp = 1._r8
+                     w%rpp = 1._r8
                      qflx_tran_veg(p) = 0._r8
                   end if
                end if
@@ -1006,8 +984,8 @@ contains
                ! Air has same conductance for both sensible and latent heat.
                ! Moved the original subroutine in-line...
 
-               w%wtaq    = frac_veg_nosno(p)/raw(p,above_canopy)             ! air
-               w%wtlq    = frac_veg_nosno(p)*(elai(p)+esai(p))/rb(p) * rpp   ! leaf
+               w%wtaq    = frac_veg_nosno(p)/w%raw(above_canopy)             ! air
+               w%wtlq    = frac_veg_nosno(p)*(elai(p)+esai(p))/w%rb * w%rpp   ! leaf
 
                !Litter layer resistance. Added by K.Sakaguchi
                w%snow_depth_c = z_dl ! critical depth for 100% litter burial by snow (=litter thickness)
@@ -1017,16 +995,16 @@ contains
                
                ! add litter resistance and Lee and Pielke 1992 beta
                if (w%delq < 0._r8) then  !dew. Do not apply beta for negative flux (follow old rsoil)
-                  wtgq(p) = frac_veg_nosno(p)/(raw(p,below_canopy)+w%rdl)
+                  w%wtgq = frac_veg_nosno(p)/(w%raw(below_canopy)+w%rdl)
                else
                   if (do_soilevap_beta()) then
-                     wtgq(p) = soilbeta(c)*frac_veg_nosno(p)/(raw(p,below_canopy)+w%rdl)
+                     w%wtgq = soilbeta(c)*frac_veg_nosno(p)/(w%raw(below_canopy)+w%rdl)
                   endif
                end if
                
-               w%wtsqi   = 1._r8/(w%wtaq+w%wtlq+wtgq(p))
+               w%wtsqi   = 1._r8/(w%wtaq+w%wtlq+w%wtgq)
                
-               w%wtgq0    = wtgq(p)*w%wtsqi      ! ground
+               w%wtgq0    = w%wtgq*w%wtsqi      ! ground
                w%wtlq0 = w%wtlq*w%wtsqi         ! leaf
                w%wtaq0 = w%wtaq*w%wtsqi         ! air
                
@@ -1052,9 +1030,9 @@ contains
                     +(1._r8-frac_sno(c)-frac_h2osfc(c))*t_soisno(c,1)**4 &
                     +frac_h2osfc(c)*t_h2osfc(c)**4)
                
-               dt_veg(p) = (sabv(p) + air(p) + bir(p)*t_veg(p)**4 + &
-                    cir(p)*w%lw_grnd - w%efsh - w%efe) / &
-                    (- 4._r8*bir(p)*t_veg(p)**3 +w%dc1*w%wtga +w%dc2*w%wtgaq*w%qsatldT)
+               dt_veg(p) = (sabv(p) + w%air + w%bir*t_veg(p)**4 + &
+                    w%cir*w%lw_grnd - w%efsh - w%efe) / &
+                    (- 4._r8*w%bir*t_veg(p)**3 +w%dc1*w%wtga +w%dc2*w%wtgaq*w%qsatldT)
                t_veg(p) = w%tlbef + dt_veg(p)
                w%dels = dt_veg(p)
                w%del  = abs(w%dels)
@@ -1062,8 +1040,8 @@ contains
                if (w%del > delmax) then
                   dt_veg(p) = delmax*w%dels/w%del
                   t_veg(p) = w%tlbef + dt_veg(p)
-                  w%err = sabv(p) + air(p) + bir(p)*w%tlbef**3*(w%tlbef + &
-                       4._r8*dt_veg(p)) + cir(p)*w%lw_grnd - &
+                  w%err = sabv(p) + w%air + w%bir*w%tlbef**3*(w%tlbef + &
+                       4._r8*dt_veg(p)) + w%cir*w%lw_grnd - &
                        (w%efsh + w%dc1*w%wtga*dt_veg(p)) - (w%efe + &
                        w%dc2*w%wtgaq*w%qsatldT*dt_veg(p))
                end if
@@ -1075,7 +1053,7 @@ contains
                
                w%efpot = forc_rho(t)*w%wtl*(w%wtgaq*(w%qsatl+w%qsatldT*dt_veg(p)) &
                     -w%wtgq0*qg(c)-w%wtaq0*forc_q(t))
-               qflx_evap_veg(p) = rpp*w%efpot
+               qflx_evap_veg(p) = w%rpp*w%efpot
                
                ! Calculation of evaporative potentials (efpot) and
                ! interception losses; flux in kg m**-2 s-1.  ecidif
@@ -1089,7 +1067,7 @@ contains
                   
                   w%ecidif = 0._r8
                   if (w%efpot > 0._r8 .and. btran(p) > btran0) then
-                     qflx_tran_veg(p) = w%efpot*rppdry
+                     qflx_tran_veg(p) = w%efpot*w%rppdry
                   else
                      qflx_tran_veg(p) = 0._r8
                   end if
@@ -1124,7 +1102,7 @@ contains
                w%qstar = w%temp2*w%dqh
                
                w%thvstar = w%tstar*(1._r8+0.61_r8*forc_q(t)) + 0.61_r8*forc_th(t)*w%qstar
-               zeta(p) = zldis(p)*vkc*grav*w%thvstar/(w%ustar**2*thv(c))
+               zeta(p) = zldis(p)*vkc*grav*w%thvstar/(ustar(p)**2*thv(c))
                
                if (zeta(p) >= 0._r8) then     !stable
                   zeta(p) = min(2._r8,max(zeta(p),0.01_r8))
@@ -1132,8 +1110,8 @@ contains
                else                     !unstable
                   zeta(p) = max(-100._r8,min(zeta(p),-0.01_r8))
                   if ((.not. atm_gustiness) .or. force_land_gustiness) then
-                     w%wc = beta*(-grav*w%ustar*w%thvstar*zii/thv(c))**0.333_r8
-                     ugust_total(p) = sqrt(ugust(t)**2 + w%wc**2)
+                     w%wc = beta*(-grav*ustar(p)*w%thvstar*zii/thv(c))**0.333_r8
+                     w%ugust_total = sqrt(ugust(t)**2 + w%wc**2)
                      um(p) = sqrt(w%ur*w%ur+w%wc*w%wc)
                   else
                      um(p) = max(w%ur,0.1_r8)
@@ -1150,20 +1128,20 @@ contains
                lbl_rsc_h2o(p) = getlblcef(forc_rho(t),t_veg(p))*uaf(p)/(uaf(p)**2._r8+1.e-10_r8)   
 
                ! Test for convergence
-               iter_final = itlef
-               itlef = itlef+1
+               w%iter_final = w%itlef
+               w%itlef = w%itlef+1
                
                w%dele = abs(w%efe-w%efeb)
                w%efeb = w%efe
                w%det  = max(w%del,w%del2)
-               num_iter(p) = real(itlef,r8)
+               num_iter(p) = real(w%itlef,r8)
                
                if ( (.not. (w%det < dtmin .and. w%dele < dlemin) .or. &
                     (implicit_stress .and. abs(w%tau_diff) >= dtaumin)) .and. &
-                    (itlef < itmax)) then
-                  converge_tveg = .false.
+                    (w%itlef < itmax)) then
+                  w%converge_tveg = .false.
                else
-                  converge_tveg = .true.
+                  w%converge_tveg = .true.
                end if
             end do iterate_tveg
 
@@ -1187,13 +1165,13 @@ contains
 
             istoma_converge_if: if( do_b4b .or. &
                                     (w%del_gs < max_del_gs ) .or.  &
-                                    (itstoma>=itmax_stomata) ) then
-               converge_stoma = .true.
+                                    (w%itstoma>=itmax_stomata) ) then
+               w%converge_stoma = .true.
                
             else
                
                ! Update the outer (stomata c) counter
-               itstoma = itstoma + 1
+               w%itstoma = w%itstoma + 1
                num_iter(p) = num_iter(p) + 1
                
                ! Update the previous resistances
@@ -1207,8 +1185,8 @@ contains
                ! we hold the value calculated in the outer loop
                ! as constant during this inner loop (tveg) iteration
 
-               call WrapPhotosynthesis(bounds,p,svpts,eah,o2,co2,rb,dayl_factor, &
-                    btran,[w%qsatl],[w%qaf],atm2lnd_vars,canopystate_vars,photosyns_vars, &
+               call WrapPhotosynthesis(bounds,p,w%svpts,w%eah,forc_po2(t),forc_pco2(t),w%rb,w%dayl_factor, &
+                    btran(p),w%qsatl,w%qaf,atm2lnd_vars,canopystate_vars,photosyns_vars, &
                     soilstate_vars, surfalb_vars,solarabs_vars,cnstate_vars,energyflux_vars)
                
             end if istoma_converge_if
@@ -1222,9 +1200,9 @@ contains
               +(1._r8-frac_sno(c)-frac_h2osfc(c))*t_soisno(c,1)**4 &
               +frac_h2osfc(c)*t_h2osfc(c)**4)
 
-         w%err = sabv(p) + air(p) + bir(p)*w%tlbef**3*(w%tlbef + 4._r8*dt_veg(p)) &
+         w%err = sabv(p) + w%air + w%bir*w%tlbef**3*(w%tlbef + 4._r8*dt_veg(p)) &
                                 !+ cir(p)*t_grnd(c)**4 - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
-              + cir(p)*w%lw_grnd - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
+              + w%cir*w%lw_grnd - eflx_sh_veg(p) - hvap*qflx_evap_veg(p)
 
          ! Fluxes from ground to canopy space
 
@@ -1235,28 +1213,28 @@ contains
             taux(p) = taux(p) * (w%wind_speed_adj / w%wind_speed0)
             tauy(p) = tauy(p) * (w%wind_speed_adj / w%wind_speed0)
          end if
-         eflx_sh_grnd(p) = cpair*forc_rho(t)*wtg(p)*w%delt
+         eflx_sh_grnd(p) = cpair*forc_rho(t)*w%wtg*w%delt
 
          ! compute individual sensible heat fluxes
          w%delt_snow = w%wtal*t_soisno(c,snl(c)+1)-w%wtl0*t_veg(p)-w%wta0*thm(p)
-         eflx_sh_snow(p) = cpair*forc_rho(t)*wtg(p)*w%delt_snow
+         eflx_sh_snow(p) = cpair*forc_rho(t)*w%wtg*w%delt_snow
 
          w%delt_soil  = w%wtal*t_soisno(c,1)-w%wtl0*t_veg(p)-w%wta0*thm(p)
-         eflx_sh_soil(p) = cpair*forc_rho(t)*wtg(p)*w%delt_soil
+         eflx_sh_soil(p) = cpair*forc_rho(t)*w%wtg*w%delt_soil
 
          w%delt_h2osfc  = w%wtal*t_h2osfc(c)-w%wtl0*t_veg(p)-w%wta0*thm(p)
-         eflx_sh_h2osfc(p) = cpair*forc_rho(t)*wtg(p)*w%delt_h2osfc
-         qflx_evap_soi(p) = forc_rho(t)*wtgq(p)*w%delq
+         eflx_sh_h2osfc(p) = cpair*forc_rho(t)*w%wtg*w%delt_h2osfc
+         qflx_evap_soi(p) = forc_rho(t)*w%wtgq*w%delq
 
          ! compute individual latent heat fluxes
          w%delq_snow = w%wtalq*qg_snow(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
-         qflx_ev_snow(p) = forc_rho(t)*wtgq(p)*w%delq_snow
+         qflx_ev_snow(p) = forc_rho(t)*w%wtgq*w%delq_snow
 
          w%delq_soil = w%wtalq*qg_soil(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
-         qflx_ev_soil(p) = forc_rho(t)*wtgq(p)*w%delq_soil
+         qflx_ev_soil(p) = forc_rho(t)*w%wtgq*w%delq_soil
 
          w%delq_h2osfc = w%wtalq*qg_h2osfc(c)-w%wtlq0*w%qsatl-w%wtaq0*forc_q(t)
-         qflx_ev_h2osfc(p) = forc_rho(t)*wtgq(p)*w%delq_h2osfc
+         qflx_ev_h2osfc(p) = forc_rho(t)*w%wtgq*w%delq_h2osfc
 
          ! 2 m height air temperature
 
@@ -1286,8 +1264,8 @@ contains
 
          ! Derivative of soil energy flux with respect to soil temperature
 
-         cgrnds(p) = cgrnds(p) + cpair*forc_rho(t)*wtg(p)*w%wtal
-         cgrndl(p) = cgrndl(p) + forc_rho(t)*wtgq(p)*w%wtalq*dqgdT(c)
+         cgrnds(p) = cgrnds(p) + cpair*forc_rho(t)*w%wtg*w%wtal
+         cgrndl(p) = cgrndl(p) + forc_rho(t)*w%wtgq*w%wtalq*dqgdT(c)
          cgrnd(p)  = cgrnds(p) + cgrndl(p)*htvp(c)
 
          ! Update dew accumulation (kg/m2)
@@ -1300,7 +1278,7 @@ contains
                write(iulog,*)'WARNING: Stress did not converge for canopy ',&
                     ' nstep = ',nstep_mod,' p= ',p,' prev_tau_diff= ',w%prev_tau_diff,&
                     ' tau_diff= ',w%tau_diff,' tau= ',w%tau,&
-                    ' wind_speed_adj= ',w%wind_speed_adj,' iter_final= ',iter_final
+                    ' wind_speed_adj= ',w%wind_speed_adj,' iter_final= ',w%iter_final
             end if
          end if
 
@@ -1312,17 +1290,18 @@ contains
       !$OMP END PARALLEL DO
 
       ! Check if forcing height is below canopy height for any patch
-      do f = 1, fn
-         p = filterp(f)
-         if (zldis(p) < 0._r8) then
-            if ( .not. use_fates ) then
+      if ( .not. use_fates ) then
+         do f = 1, fn
+            p = filterp(f)
+            if (zldis(p) < 0._r8) then
 #ifndef _OPENACC
-            write(iulog,*)'Error: Forcing height is below canopy height for pft index '
-            call endrun(decomp_index=index, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
+               write(iulog,*)'Error: Forcing height is below canopy height for pft index ',p
+               call endrun(decomp_index=index, elmlevel=namep, msg=errmsg(__FILE__, __LINE__))
 #endif
-         end if
-      end do
-
+            end if
+         end do
+      end if
+      
       call t_stop_lnd(event)
 
       if ( use_fates ) then
@@ -1359,15 +1338,15 @@ contains
     
     type(bounds_type)         , intent(in)    :: bounds
     integer  :: p                                        ! patch index from begp:endp
-    real(r8) :: svpts(bounds%begp:bounds%endp)
-    real(r8) :: eah(bounds%begp:bounds%endp)
-    real(r8) :: o2(bounds%begp:bounds%endp)
-    real(r8) :: co2(bounds%begp:bounds%endp)
-    real(r8) :: rb(bounds%begp:bounds%endp)
-    real(r8) :: dayl_factor(bounds%begp:bounds%endp)
-    real(r8) :: btran(bounds%begp:bounds%endp)
-    real(r8) :: qsatl(bounds%begp:bounds%endp)
-    real(r8) :: qaf(bounds%begp:bounds%endp)
+    real(r8) :: svpts
+    real(r8) :: eah
+    real(r8) :: o2
+    real(r8) :: co2
+    real(r8) :: rb
+    real(r8) :: dayl_factor
+    real(r8) :: btran
+    real(r8) :: qsatl
+    real(r8) :: qaf
     
     type(atm2lnd_type)        , intent(inout) :: atm2lnd_vars
     type(canopystate_type)    , intent(inout) :: canopystate_vars
@@ -1378,6 +1357,16 @@ contains
     type(cnstate_type)        , intent(inout) :: cnstate_vars
     type(energyflux_type)     , intent(inout) :: energyflux_vars
 
+    real(r8) :: svpts_a(bounds%begp:bounds%endp)
+    real(r8) :: eah_a(bounds%begp:bounds%endp)
+    real(r8) :: o2_a(bounds%begp:bounds%endp)
+    real(r8) :: co2_a(bounds%begp:bounds%endp)
+    real(r8) :: rb_a(bounds%begp:bounds%endp)
+    real(r8) :: dayl_factor_a(bounds%begp:bounds%endp)
+    real(r8) :: btran_a(bounds%begp:bounds%endp)
+    real(r8) :: qsatl_a(bounds%begp:bounds%endp)
+    real(r8) :: qaf_a(bounds%begp:bounds%endp)
+    
     integer :: begp,endp
 
     begp = bounds%begp
@@ -1390,23 +1379,34 @@ contains
 #ifndef _OPENACC
 
        call alm_fates%WrapPatchPhotosynthesis(bounds, p, &
-            svpts(begp:endp), eah(begp:endp), o2(begp:endp), &
-            co2(begp:endp), rb(begp:endp), dayl_factor(begp:endp), &
+            svpts, eah, o2, &
+            co2, rb, dayl_factor, &
             atm2lnd_vars, canopystate_vars, photosyns_vars)
 #endif
     else ! not use_fates
+
+       svpts_a(p) = svpts
+       eah_a(p) = eah
+       o2_a(p) = o2
+       co2_a(p) = co2
+       rb_a(p) = rb
+       dayl_factor_a(p) = dayl_factor
+       btran_a(p) = btran
+       qsatl_a(p) = qsatl
+       qaf_a(p) = qaf
+       
        if ( use_hydrstress ) then
           call PhotosynthesisHydraulicStress (bounds, 1, [p], &
-               svpts(begp:endp), eah(begp:endp), o2(begp:endp), co2(begp:endp), rb(begp:endp), &
+               svpts_a(begp:endp), eah_a, o2_a, co2_a, rb_a, &
                energyflux_vars%bsun_patch(begp:endp), energyflux_vars%bsha_patch(begp:endp), &
-               btran(begp:endp), dayl_factor(begp:endp), &
-               qsatl(begp:endp), qaf(begp:endp),     &
+               btran_a, dayl_factor_a, &
+               qsatl_a, qaf_a,     &
                atm2lnd_vars, soilstate_vars, surfalb_vars, solarabs_vars,    &
                canopystate_vars, photosyns_vars)
        else
           call Photosynthesis (bounds, 1, [p], &
-               svpts(begp:endp), eah(begp:endp), o2(begp:endp), co2(begp:endp), rb(begp:endp), btran(begp:endp), &
-               dayl_factor(begp:endp), atm2lnd_vars,  surfalb_vars, solarabs_vars, &
+               svpts_a, eah_a, o2_a, co2_a, rb_a, btran_a, &
+               dayl_factor_a, atm2lnd_vars,  surfalb_vars, solarabs_vars, &
                canopystate_vars, photosyns_vars, 'sun')
        end if
        
@@ -1417,16 +1417,16 @@ contains
        
        ! soybean (crop with N fixation)
        if (crop(veg_pp%itype(p)) >= 1 .and. nfixer(veg_pp%itype(p)) == 1) then
-          btran(p) = min(1._r8, btran(p) * 1.25_r8)
+          btran_a(p) = min(1._r8, btran_a(p) * 1.25_r8)
        end if
        
        if ( .not. use_hydrstress ) then
           call Photosynthesis (bounds, 1, [p], &
-               svpts(begp:endp), eah(begp:endp), o2(begp:endp), co2(begp:endp), rb(begp:endp), btran(begp:endp), &
-               dayl_factor(begp:endp), atm2lnd_vars,surfalb_vars, solarabs_vars, &
+               svpts_a, eah_a, o2_a, co2_a, rb_a, btran_a, &
+               dayl_factor_a, atm2lnd_vars,surfalb_vars, solarabs_vars, &
                canopystate_vars, photosyns_vars, 'sha')
-       end if
-       
+      end if
+      
        if ( use_c13 ) then
           call Fractionation (bounds, 1, [p],  &
                cnstate_vars, solarabs_vars, surfalb_vars, photosyns_vars, 0)
@@ -1434,5 +1434,77 @@ contains
     end if if_fates ! end of if use_fates
 
   end subroutine WrapPhotosynthesis
+
+  ! ===========================================================================
   
+  subroutine FrictionVelocityPatch(lbn,ubn, p, displa, z0m, z0h, z0q, &
+       obu, iter, ur, um, ugust, ustar, &
+       temp1, temp2, temp12m, temp22m, fm, &
+       frictionvel_vars)
+
+    implicit none
+    !
+    ! !ARGUMENTS:
+    integer  , intent(in)  :: lbn
+    integer  , intent(in)  :: ubn
+    integer  , intent(in)  :: p
+    real(r8) , intent(in)  :: displa
+    real(r8) , intent(in)  :: z0m
+    real(r8) , intent(in)  :: z0h
+    real(r8) , intent(in)  :: z0q
+    real(r8) , intent(in)  :: obu
+    integer  , intent(in)  :: iter
+    real(r8) , intent(in)  :: ur
+    real(r8) , intent(in)  :: um
+    real(r8) , intent(in)  :: ugust
+    real(r8) , intent(out) :: ustar
+    real(r8) , intent(out) :: temp1
+    real(r8) , intent(out) :: temp12m
+    real(r8) , intent(out) :: temp2
+    real(r8) , intent(out) :: temp22m
+    real(r8) , intent(out) :: fm
+    type(frictionvel_type) , intent(inout) :: frictionvel_vars
+
+
+    real(r8) :: displa_a( lbn:ubn ) 
+    real(r8) :: z0m_a( lbn:ubn ) 
+    real(r8) :: z0h_a( lbn:ubn ) 
+    real(r8) :: z0q_a( lbn:ubn ) 
+    real(r8) :: obu_a( lbn:ubn ) 
+    real(r8) :: ur_a( lbn:ubn ) 
+    real(r8) :: um_a( lbn:ubn ) 
+    real(r8) :: ugust_a( lbn:ubn ) 
+    real(r8) :: ustar_a   ( lbn:ubn )         ! friction velocity [m/s] [lbn:ubn]
+    real(r8) :: temp1_a   ( lbn:ubn )         ! relation for potential temperature profile [lbn:ubn]
+    real(r8) :: temp12m_a ( lbn:ubn )         ! relation for potential temperature profile applied at 2-m [lbn:ubn]
+    real(r8) :: temp2_a   ( lbn:ubn )         ! relation for specific humidity profile [lbn:ubn]
+    real(r8) :: temp22m_a ( lbn:ubn )         ! relation for specific humidity profile applied at 2-m [lbn:ubn]
+    real(r8) :: fm_a      ( lbn:ubn )         ! diagnose 10m wind (DUST only) [lbn:ubn]
+
+
+    displa_a(p) = displa
+    z0m_a(p)  = z0m
+    z0h_a(p)  = z0h
+    z0q_a(p)  = z0q
+    obu_a(p)  = obu
+    ur_a(p)   = ur
+    um_a(p)   = um
+    ugust_a(p) = ugust
+    
+    call FrictionVelocity (lbn, ubn, 1, [p], &
+         displa_a, z0m_a, z0h_a, z0q_a, &
+         obu_a, iter, ur_a, um_a, ugust_a, ustar_a, &
+         temp1_a, temp2_a, temp12m_a, temp22m_a, fm_a, &
+         frictionvel_vars)
+
+    ustar   = ustar_a(p)
+    temp1   = temp1_a(p)
+    temp2   = temp2_a(p)
+    temp12m = temp12m_a(p)
+    temp22m = temp22m_a(p)
+    fm      = fm_a(p)
+
+    return
+  end subroutine FrictionVelocityPatch
+
 end module CanopyFluxesMod
