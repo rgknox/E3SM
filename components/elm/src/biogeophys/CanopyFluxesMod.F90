@@ -573,6 +573,8 @@ contains
       !assign the temporary filter
       do f = 1, fn
          p = filterp(f)
+         btran(p)   = btran0
+         btran2(p)  = btran0
          filterc_tmp(f)=veg_pp%column(p)
       enddo
 
