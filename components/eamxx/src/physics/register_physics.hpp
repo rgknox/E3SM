@@ -23,6 +23,9 @@
 #ifdef EAMXX_HAS_SPA
 #include "physics/spa/eamxx_spa_process_interface.hpp"
 #endif
+#ifdef EAMXX_HAS_SPC
+#include "physics/spc/eamxx_spc_process_interface.hpp"
+#endif
 #ifdef EAMXX_HAS_NUDGING
 #include "physics/nudging/eamxx_nudging_process_interface.hpp"
 #endif
@@ -40,9 +43,6 @@
 #endif
 #ifdef EAMXX_HAS_TMS
 #include "physics/tms/eamxx_tms_process_interface.hpp"
-#endif
-#ifdef EAMXX_HAS_ML_CORRECTION
-#include "physics/ml_correction/eamxx_ml_correction_process_interface.hpp"
 #endif
 #ifdef EAMXX_HAS_IOP_FORCING
 #include "physics/iop_forcing/eamxx_iop_forcing_process_interface.hpp"
@@ -73,6 +73,9 @@ inline void register_physics () {
 #ifdef EAMXX_HAS_SPA
   proc_factory.register_product("SPA",&create_atmosphere_process<SPA>);
 #endif
+#ifdef EAMXX_HAS_SPC
+  proc_factory.register_product("SPC",&create_atmosphere_process<SPC>);
+#endif
 #ifdef EAMXX_HAS_NUDGING
   proc_factory.register_product("Nudging",&create_atmosphere_process<Nudging>);
 #endif
@@ -90,9 +93,6 @@ inline void register_physics () {
 #endif
 #ifdef EAMXX_HAS_TMS
   proc_factory.register_product("tms",&create_atmosphere_process<TurbulentMountainStress>);
-#endif
-#ifdef EAMXX_HAS_ML_CORRECTION
-  proc_factory.register_product("MLCorrection",&create_atmosphere_process<MLCorrection>);
 #endif
 #ifdef EAMXX_HAS_IOP_FORCING
   proc_factory.register_product("iop_forcing",&create_atmosphere_process<IOPForcing>);

@@ -451,15 +451,6 @@ be lost if SCREAM_HACK_XML is not enabled.
       </nudging_refine_remap_vert_cutoff>
     </nudging>
 
-    <!-- ML correction -->
-    <ml_correction inherit="atm_proc_base">
-      <ml_model_path_tq type="string" doc="Path to pre-trained ML model for temperature and specific humidity"/>
-      <ml_model_path_uv type="string" doc="Path to pre-trained ML model for wind fields"/>
-      <ml_model_path_sfc_fluxes type="string" doc="Path to pre-trained ML model for surface fluxes"/>
-      <ml_output_fields type="array(string)" doc="ML correction output variables, the following variables are supported: T_mid,qv,u,v"/>
-      <ml_correction_unit_test type="logical">false</ml_correction_unit_test>
-    </ml_correction>
-
     <!-- IOPForcing -->
     <iop_forcing inherit="atm_proc_base" />
 
@@ -489,6 +480,22 @@ be lost if SCREAM_HACK_XML is not enabled.
       <spa_data_file hgrid="ne4np4">${DIN_LOC_ROOT}/atm/scream/init/spa_file_unified_and_complete_ne4_20220428.nc</spa_data_file>
       <spa_data_file hgrid="ne4np4.pg2">${DIN_LOC_ROOT}/atm/scream/init/spa_file_unified_and_complete_ne4pg2_20231222.nc</spa_data_file>
     </spa>
+
+    <!-- Simple Prescribed Chemistry (SPC) -->
+    <spc inherit="atm_proc_base">
+      <spc_remap_file type="file" doc="File containing mapping data from the grid of spc_data_file to the model grid. Unused if the grid is the same.">none</spc_remap_file>
+      <spc_remap_file hgrid="ne120np4">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30np4_to_ne120np4_mono_20220502.nc</spc_remap_file>
+      <spc_remap_file hgrid="ne120np4.pg2">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30pg2_to_ne120pg2_20231201.nc</spc_remap_file>
+      <spc_remap_file hgrid="ne256np4.pg2">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30pg2_to_ne256pg2_20231201.nc</spc_remap_file>
+      <spc_remap_file hgrid="ne512np4.pg2">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30pg2_to_ne512pg2_20231201.nc</spc_remap_file>
+      <spc_remap_file hgrid="ne1024np4.pg2">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30pg2_to_ne1024pg2_20231201.nc</spc_remap_file>
+      <spc_remap_file hgrid="ne0np4_CAx32v1">${DIN_LOC_ROOT}/atm/scream/maps/map_ne30np4_to_CAx32v1pg2_intbilin_se2fv_20230420.nc</spc_remap_file>
+      <spc_remap_file COMPSET=".*DP-EAMxx">none</spc_remap_file>
+
+      <spc_data_file type="file" doc="File containing chemistry data. Must be on same grid as the atm, or a coarser one">none</spc_data_file>
+      <spc_data_file hgrid="ne.*np4.pg2">${DIN_LOC_ROOT}/atm/scream/init/spc_from_v3LRamip_2010_clim_ne30pg2_c20260206.nc</spc_data_file>
+      <spc_data_file hgrid="ne4np4.pg2">${DIN_LOC_ROOT}/atm/scream/init/spc_from_v3LRamip_2010_clim_ne4pg2_c20260211.nc</spc_data_file>
+    </spc>
 
     <!-- Radiation -->
     <rrtmgp inherit="atm_proc_base">
@@ -739,6 +746,7 @@ be lost if SCREAM_HACK_XML is not enabled.
   <!-- List of yaml files containing I/O output specs -->
   <scorpio>
     <output_yaml_files type="array(string)"/>
+    <enable_fine_grain_timers type="logical" doc="If enabled, more timers in the IO streams will be active">false</enable_fine_grain_timers>
     <model_restart>
       <iotype>default</iotype>
       <output_control locked="true">
