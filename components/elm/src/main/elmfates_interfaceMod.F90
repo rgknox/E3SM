@@ -883,7 +883,7 @@ contains
       ! This involves to stages
       ! 1) allocate the vectors
       ! 2) add the history variables defined in clm_inst to the history machinery
-      call param_derived%Init( numpft_fates )
+      call param_derived%Init()
 
       ! Initialize dispersal
       if (fates_seeddisp_cadence /= fates_dispersal_cadence_none) then
