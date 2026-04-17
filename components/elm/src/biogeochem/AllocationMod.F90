@@ -2023,6 +2023,14 @@ contains
            s = elm_fates%f2hmap(ci)%hsites(c)
            n_pcomp = elm_fates%fates(ci)%bc_out(s)%num_plant_comps
 
+           ! Plant optimization wants to know how soil nutrient
+           ! concentrations are changing
+           do j = 1,nlevdecomp
+              elm_fates%fates(ci)%bc_in(s)%nh4_prof(j) = smin_nh4_vr(c,j)
+              elm_fates%fates(ci)%bc_in(s)%no3_prof(j) = smin_no3_vr(c,j)
+              elm_fates%fates(ci)%bc_in(s)%po4_prof(j) = solutionp_vr(c,j)
+           end do
+           
            if (nu_com .eq. 'RD') then
 
               if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
