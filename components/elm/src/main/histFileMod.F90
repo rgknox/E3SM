@@ -1947,6 +1947,7 @@ contains
        call ncd_defdim(lnfid, 'fates_levcnlfpf', nlevleaf_fates * nclmax_fates * numpft_fates, dimid)
        call ncd_defdim(lnfid, 'fates_levcdsc', nlevdamage_fates * nlevsclass_fates, dimid)
        call ncd_defdim(lnfid, 'fates_levcdpf', nlevdamage_fates * nlevsclass_fates * numpft_fates, dimid)
+       call ncd_defdim(lnfid, 'fates_levclpf', nclmax_fates * numpft_fates, dimid)
        call ncd_defdim(lnfid, 'fates_levcdam', nlevdamage_fates, dimid)
        call ncd_defdim(lnfid, 'fates_levscagpf', nlevsclass_fates * nlevage_fates * numpft_fates, dimid)
        call ncd_defdim(lnfid, 'fates_levagepft', nlevage_fates * numpft_fates, dimid)
@@ -4881,6 +4882,8 @@ contains
        num2d = nlevdamage_fates * nlevsclass_fates
     case ('fates_levcdpf')
        num2d = nlevdamage_fates * nlevsclass_fates * numpft_fates
+    case ('fates_levclpf')
+       num2d = nclmax_fates * numpft_fates
     case ('fates_levcdam')
        num2d = nlevdamage_fates
     case ('fates_levheight')

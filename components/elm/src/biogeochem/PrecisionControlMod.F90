@@ -664,6 +664,12 @@ contains
                   cn_eca = 0.0_r8
                   do l = 1,ndecomp_pools
                      if ( col_cs%decomp_cpools_vr(c,j,l) > 0.0_r8 ) then
+
+                       ! print*,"1", col_cs%decomp_cpools_vr(c,j,l)
+                       ! print*,"2", col_ns%decomp_npools_vr(c,j,l)
+                       ! print*,"3", initial_cn_ratio(l)
+                       ! print*,"4", floating_cn_ratio_decomp_pools(l)
+                        
                           if(abs(col_cs%decomp_cpools_vr(c,j,l) / col_ns%decomp_npools_vr(c,j,l) - initial_cn_ratio(l) ) > 1.0e-3_r8 &
                           .and. (.not. floating_cn_ratio_decomp_pools(l)) ) then
                         cn_eca = cn_eca - ( col_cs%decomp_cpools_vr(c,j,l) / initial_cn_ratio(l) - col_ns%decomp_npools_vr(c,j,l) )
