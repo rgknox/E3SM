@@ -24,6 +24,29 @@ import xml.etree.ElementTree as ET
 #      "datm.streams.txt.topo.observed 1 1 1"
 
 
+def GetXmlVals(root,group_str,tag_id_name,tag_name):
+
+    text_list = []
+    entry = f"./entry[@id='{group_str}']"
+    streams_entry = root.find(entry)
+    if streams_entry is None:
+        print('big problems, no strealist?')
+    else:
+        # Find all <value> tags inside this specific entry
+        value_tags = streams_entry.findall('.//value')
+        for val in value_tags:
+            mode_attr = val.attrib.get(tag_id_name, '')
+            if(tag_name=='list'):
+                # Collect every defined mode attribute
+                if mode_attr:
+                    print(mode_attr)
+            else:            
+                # If it matches the one we want, split the comma-separated text into a list
+                if mode_attr == tag_name and val.text:
+                    text_list = [stream.strip() for stream in val.text.split(',')]
+                    
+    return text_list
+
 def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
     """
     Identify spatial indices in a dataset that are nearest to the lat-lon list
@@ -46,11 +69,22 @@ def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
     # Extract the 2D coordinate arrays
     latixy = ds["LATIXY"].values  # shape (lat, lon)
     longxy = ds["LONGXY"].values  # shape (lat, lon)
-
+    
+    # --- normalize longitude convention -------------------------------
+    domain_max_lon = np.nanmax(longxy)
+    if domain_max_lon > 180.0:
+        print(f"--> Detected Surface Convention: 0 to 360 (Max lon: {domain_max_lon:.2f})")
+        target_lons_adjusted = np.array(target_lons) % 360
+        
+    else:
+        print(f"--> Detected Surface Convention: -180 to 180 (Max lon: {domain_max_lon:.2f})")
+        target_lons_adjusted = ((np.array(target_lons) + 180) % 360) - 180
+    target_lats = np.array(target_lats)
+    
     lat_indices = []
     lon_indices = []
 
-    for tlat, tlon in zip(target_lats, target_lons):
+    for tlat, tlon in zip(target_lats, target_lons_adjusted):
         # Compute distance (simple Euclidean in lat/lon space)
         # For more accuracy over large distances, use haversine instead
         dist = np.sqrt((latixy - tlat) ** 2 + (longxy - tlon) ** 2)
@@ -58,11 +92,17 @@ def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
         lat_indices.append(idx[0])
         lon_indices.append(idx[1])
 
+    #rows = xr.DataArray(lat_indices, dims="points")
+    #cols = xr.DataArray(lon_indices, dims="points")
+    #matched_longxy = ds.LONGXY.isel(x=rows, y=cols)
+    #print(f"base lon: {matched_longxy}")
+    print(f"base lon: {ds.LONGXY.isel(lat=lat_indices[0],lon=lon_indices[0]).values}")
+    
     return lat_indices,lon_indices
 
 def RegridSurface(base_ds: xr.Dataset,
                   target_lats: list,
-                  lon_points: list,
+                  target_lons: list,
                   lat_name: str = "lsmlat",
                   lon_name: str = "lsmlon") -> xr.Dataset:
     """
@@ -82,14 +122,16 @@ def RegridSurface(base_ds: xr.Dataset,
     lat_mesh = base_ds["LATIXY"].values   # Shape: (lsmlat, lsmlon)
     lon_mesh = base_ds["LONGXY"].values   # Shape: (lsmlat, lsmlon)
 
+    print(f"base lon range:{np.min(lon_mesh)} {np.max(lon_mesh)}")
+    
     # --- normalize longitude convention -------------------------------
     domain_max_lon = np.nanmax(lon_mesh)
     if domain_max_lon > 180.0:
         print(f"--> Detected Surface Convention: 0 to 360 (Max lon: {domain_max_lon:.2f})")
-        target_lons_adjusted = np.array(lon_points) % 360
+        target_lons_adjusted = np.array(target_lons) % 360
     else:
         print(f"--> Detected Surface Convention: -180 to 180 (Max lon: {domain_max_lon:.2f})")
-        target_lons_adjusted = ((np.array(lon_points) + 180) % 360) - 180
+        target_lons_adjusted = ((np.array(target_lons) + 180) % 360) - 180
 
     target_lats = np.array(target_lats)
 
@@ -97,7 +139,7 @@ def RegridSurface(base_ds: xr.Dataset,
     matched_lat_indices = []
     matched_lon_indices = []
 
-    for t_lat, t_lon in zip(lat_points, target_lons_adjusted):
+    for t_lat, t_lon in zip(target_lats, target_lons_adjusted):
         diff_squared = (lat_mesh - t_lat) ** 2 + (lon_mesh - t_lon) ** 2
         lat_idx, lon_idx = np.unravel_index(np.argmin(diff_squared),
                                             diff_squared.shape)
@@ -116,13 +158,15 @@ def RegridSurface(base_ds: xr.Dataset,
     lon_da = xr.DataArray(lon_indices, dims="gridcell")
 
     new_ds = base_ds.isel({lat_name: lat_da, lon_name: lon_da})
-
+    
+    print(f"new surface lats: {new_ds['LATIXY'].values}, lons:{new_ds['LONGXY'].values}")
+    
     return new_ds
 
     
     
 
- def RegridMet(ds: xr.Dataset, lat_indices: list, lon_indices: list) -> xr.Dataset:
+def RegridMet(ds: xr.Dataset, lat_indices: list, lon_indices: list) -> xr.Dataset:
     """
     Subset a dataset. This assumes that the desired points have already
     been identified. Data arrays with dimensions "lat" and "lon" will be subset using the
@@ -224,7 +268,7 @@ def RegridDomain(base_ds : xr.Dataset, lat_points: list, lon_points: list) -> xr
         print(f"--> Detected Domain Convention: -180 to 180 (Max lon found: {domain_max_lon:.2f})")
         # Convert input targets to -180 to 180
         target_lons_adjusted = ((np.array(lon_points) + 180) % 360) - 180
-
+        
     lat_points = np.array(lat_points)
     
     # -----------------------------------------------------------------
@@ -233,12 +277,11 @@ def RegridDomain(base_ds : xr.Dataset, lat_points: list, lon_points: list) -> xr
     matched_lat_indices = []
     matched_lon_indices = []
 
-    for t_lat, t_lon in zip(lat_points, lon_points):
+    for t_lat, t_lon in zip(lat_points, target_lons_adjusted):
 
         diff_squared = (lat_mesh - t_lat) ** 2 + (lon_mesh - t_lon) ** 2
         lat_idx, lon_idx = np.unravel_index(np.argmin(diff_squared), diff_squared.shape)
 
-        print(f"pulling lat: {lat_mesh[lat_idx,lon_idx]}, lon: {lon_mesh[lat_idx,lon_idx]}")
         matched_lat_indices.append(lat_idx)
         matched_lon_indices.append(lon_idx)
     
@@ -258,7 +301,7 @@ def RegridDomain(base_ds : xr.Dataset, lat_points: list, lon_points: list) -> xr
     # 3. Use advanced indexing to slice the original domain file
     # 2D variables will be (1, ni); 3D variables will automatically become (nv, 1, ni)
     new_ds = base_ds.isel(nj=nj_da, ni=ni_da)
-
+    
     return new_ds
 
 def TrimDinLoc(text_str):
@@ -291,19 +334,27 @@ def TrimDinLoc(text_str):
 din_loc_root = '/dvs_ro/cfs/cdirs/e3sm/inputdata/' 
 din_loc_root_clmforc = '/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/' 
 
-new_loc_root = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.2/inputdata/'
-new_loc_root_clmforc = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.2/inputdata/atm/datm7'
+new_loc_root = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/'
+new_loc_root_clmforc = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/atm/datm7'
 
 stream_list_file = '/global/homes/r/rgknox/E3SM/components/data_comps/datm/cime_config/namelist_definition_datm.xml'
 
-# Surface Files
+# Surface and LND domain Files
+# Note that 
 # It might be useful to convert several surface files,
 # like if you are running both pre and post industrial
+# domain files are here: /global/cfs/cdirs/e3sm/inputdata/share/domains
+
+base_lnd_domain = '/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.360x720cru_oRRS15to5.190514.nc'
+
 base_surf_files = ['/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr2000_c180216.nc',
                    '/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr1850_c180216.nc']
 
 #target_mode = "ELMGSWP3w5e5"
 target_mode = "CLMGSWP3v1"
+
+lat_list = [-2.593611]
+lon_list = [-60.208611]
 
 
 # 2) Read in namelist definitions for the domain file
@@ -320,7 +371,7 @@ domain_file = GetXmlVals(stream_root,"strm_domfil","stream",target_mode)
 domain_end,domain_base,new_domain_base = TrimDinLoc(domain_dir[0]+'/'+domain_file[0])
 new_domain_file = new_domain_base+domain_end
 new_domain_path = Path(new_domain_file)
-new_domain_dir = new_domain_path.parent
+new_domain_dir = str(new_domain_path.parent)
 
 print(f"Will create directory: '{new_domain_dir}'")
 print(f" for modified version of domain file: {domain_end}")
@@ -332,12 +383,12 @@ if response != "y":
 
 new_domain_path.parent.mkdir(parents=True, exist_ok=True)
 
-# Lets convert that domain file
-base_ds = xr.open_dataset(domain_base+domain_end,engine='netcdf4')
-new_ds = RegridDomain(base_ds,lat_flat,lon_flat)
+base_ds = xr.open_dataset(base_lnd_domain,engine='netcdf4')
+atm_base_ds = xr.open_dataset(domain_base+domain_end,engine='netcdf4')
+new_ds = RegridDomain(base_ds,lat_list,lon_list)
 new_ds.to_netcdf(new_domain_file)
 
-print(f"Created new domain dataset:\n")
+print(f"Creating new domain dataset:\n")
 print(new_ds)
 response = input("Continue? (Y/N): ").strip().lower()
 if response != "y":
@@ -355,10 +406,15 @@ for base_surf_file in base_surf_files:
     new_surf_file = new_domain_dir+'/'+surf_file_name
     
     base_ds = xr.open_dataset(base_surf_file,engine='netcdf4')
-    new_ds = RegridSurface(base_ds,lat_flat,lon_flat)
+    new_ds = RegridSurface(base_ds,lat_list,lon_list)
+    print(f"Creating new surface dataset: {new_surf_file}\n")
+    print(new_ds)
+    response = input("Continue? (Y/N): ").strip().lower()
+    if response != "y":
+        print("Exiting.")
+        sys.exit()
+    
     new_ds.to_netcdf(new_surf_file)
-
-
 
 # Now, for the met data,
 # 1) Identify the streams needed from the configuration
@@ -366,9 +422,10 @@ for base_surf_file in base_surf_files:
 # 3) find the indices we will pull from by querying the first file
 # 4) go through and convert all files in those directories and put result in new folders
 
-
 stream_list = GetXmlVals(stream_root,"streamslist","datm_mode",target_mode)
 #GetXmlVals(root,"strm_datdir","stream","list")
+
+dry_run = False
 
 stream_paths = []
 for stream in stream_list:
@@ -383,7 +440,7 @@ for stream in stream_list:
     new_path = Path(new_path_dir)
 
     if os.path.isdir(new_path_dir):
-        print('folder: '+new_path.parent" already exists")
+        print('folder: '+str(new_path.parent)+' already exists, continuing')
     else:
         new_path.mkdir(parents=True)
         print('creating folder: '+new_path_dir)
@@ -393,20 +450,20 @@ for stream in stream_list:
         exit(2)
 
     # Loop only through NetCDF files
-    
     for ifp,file_path in enumerate(stream_path.glob("clmforc*.nc")):
 
         base_file_path = stream_path_dir+'/'+file_path.name
         new_file_path = new_path_dir+'/'+file_path.name
-        
-        base_ds = xr.open_dataset(base_file_path,engine='netcdf4')
+
         print(f"Converting: {file_path.name} to {new_file_path}")
+
+        base_ds = xr.open_dataset(base_file_path,engine='netcdf4')
         if(ifp==0):
-            lat_indices,lon_indices = regrid_to_points(base_ds, lat_flat, lon_flat) 
+            lat_indices,lon_indices = RegridToPoints(base_ds, lat_list, lon_list) 
+        if(not dry_run):
+            new_ds = RegridMet(base_ds,lat_indices,lon_indices)
 
-        new_ds = Regrid(base_ds,lat_indices,lon_indices)
-
-        new_ds.to_netcdf(new_file_path)
-        base_ds.close()
-        new_ds.close()    
+            new_ds.to_netcdf(new_file_path)
+            base_ds.close()
+            new_ds.close()    
 
