@@ -296,6 +296,16 @@ be lost if SCREAM_HACK_XML is not enabled.
       <mcsp_v_coeff type="real" doc="MCSP V-wind coefficient"         >0.0</mcsp_v_coeff>
     </zm>
 
+    <!-- Water tracers -->
+    <water_tracers inherit="atm_proc_base">
+      <tracer_count type="integer" doc="Number of water tracers to track (0 = disabled)" constraints="ge 0">0</tracer_count>
+    </water_tracers>
+
+    <!-- Water isotopes (subclass of water tracers with fractionation physics) -->
+    <water_isotopes inherit="atm_proc_base">
+      <tracer_count type="integer" doc="Number of isotope tracers to track (0 = disabled)" constraints="ge 0">0</tracer_count>
+    </water_isotopes>
+    
     <!-- Gravity Wave Drag -->
     <gw inherit="atm_proc_base">
       <use_gw_convect type="logical" doc="Flag for convective GWD">false</use_gw_convect>
@@ -459,6 +469,9 @@ be lost if SCREAM_HACK_XML is not enabled.
       <!-- scale factors (applied to data read from file) -->
       <srf_emis_scale_factor_for_dms type="real" doc="Surface emissions scale factor for DMS">1.0</srf_emis_scale_factor_for_dms>
 
+      <srf_emis_scale_factor_for_seasalt type="real" doc="Surface emissions scale factor for seasalt">0.6</srf_emis_scale_factor_for_seasalt>
+
+      <srf_emis_scale_factor_for_dust type="real" doc="Surface emissions scale factor for dust">1.5</srf_emis_scale_factor_for_dust>
       <dust_emis_scheme type="integer" doc="Dust emission scheme, 1: Zender et al. (2003), 2: Kok et al. (2014)">1</dust_emis_scheme>
       <soil_erodibility_file type="file" doc="File containing soil erodibility">${DIN_LOC_ROOT}/atm/scream/mam4xx/emissions/ne30pg2/dst_ne30pg2_c20241028.nc</soil_erodibility_file>
       <soil_erodibility_file hgrid="ne4np4.pg2" type="file" doc="File containing soil erodibility">${DIN_LOC_ROOT}/atm/scream/mam4xx/emissions/ne4pg2/dst_ne4pg2_c20241028.nc</soil_erodibility_file>
@@ -555,6 +568,8 @@ be lost if SCREAM_HACK_XML is not enabled.
       <spc_data_file type="file" doc="File containing chemistry data. Must be on same grid as the atm, or a coarser one">none</spc_data_file>
       <spc_data_file hgrid="ne.*np4.pg2">${DIN_LOC_ROOT}/atm/scream/init/spc_from_v3LRamip_2010_clim_ne30pg2_c20260206.nc</spc_data_file>
       <spc_data_file hgrid="ne4np4.pg2">${DIN_LOC_ROOT}/atm/scream/init/spc_from_v3LRamip_2010_clim_ne4pg2_c20260211.nc</spc_data_file>
+
+      <gas_species type="array(string)" doc="List of gas species to read in and prescribe">o3</gas_species>
 
       <time_interpolation_method type="string" doc="Method for interpolating SPC data in time">yearly_periodic</time_interpolation_method>
     </spc>
@@ -751,6 +766,8 @@ be lost if SCREAM_HACK_XML is not enabled.
     <nc_nuceat_tend    >0.0</nc_nuceat_tend>
     <!-- SHOC internally inits TKE; just set to 0 here to signal it's not in the IC file -->
     <tke               >0.0</tke>
+    <!-- ZM normally runs before SHOC, but produces odd results when pbl_height is not initialized -->
+    <pbl_height        >2000.0</pbl_height>
     <!-- Note: these should be provided by surface models, but we init here to keep AD from reading from file -->
     <sfc_alb_dir_vis   >0.0</sfc_alb_dir_vis>
     <sfc_alb_dir_nir   >0.0</sfc_alb_dir_nir>

@@ -70,7 +70,7 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
   Errors::check_option("init_simulation_params_c","dp3d_thresh",dp3d_thresh,0.0,Errors::ComparisonOp::GT);
   Errors::check_option("init_simulation_params_c","vtheta_thresh",vtheta_thresh,0.0,Errors::ComparisonOp::GT);
   Errors::check_option("init_simulation_params_c","nu_div",nu_div,0.0,Errors::ComparisonOp::GT);
-  Errors::check_option("init_simulation_params_c","theta_advection_form",theta_adv_form,{0,1});
+  Errors::check_option("init_simulation_params_c","theta_advection_form",theta_adv_form,{0,1,2});
 #ifndef SCREAM
   Errors::check_option("init_simulation_params_c","nsplit",nsplit,1,Errors::ComparisonOp::GE);
 #else
@@ -91,8 +91,10 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
 
   if (theta_adv_form==0) {
     params.theta_adv_form = AdvectionForm::Conservative;
-  } else {
+  } else if (theta_adv_form==1) {
     params.theta_adv_form = AdvectionForm::NonConservative;
+  } else if (theta_adv_form==2) {
+    params.theta_adv_form = AdvectionForm::Split;
   }
 
   params.limiter_option                = limiter_option;
@@ -469,6 +471,23 @@ void init_elements_2d_c (const int& ie,
   const bool consthv = (params.hypervis_scaling==0.0);
   e.m_geometry.set_elem_data(ie,D,Dinv,fcor,spheremp,rspheremp,metdet,metinv,tensorvisc,
                              vec_sph2cart,consthv,sphere_cart_vec,sphere_latlon_vec);
+}
+
+// Copies just tensorVisc from f90 arrays into the C++ view. Separate from
+// init_elements_2d_c() so that it can be called again, after dss_hvtensor
+// has updated tensorVisc, without re-copying the other (constant) geometry
+// fields.
+void init_tensorvisc_c (const int& ie, CF90Ptr& tensorvisc)
+{
+  auto& c = Context::singleton();
+  Elements& e = c.get<Elements> ();
+  const SimulationParams& params = c.get<SimulationParams>();
+
+  if (params.hypervis_scaling==0.0) {
+    // consthv: tensorVisc is not used/allocated.
+    return;
+  }
+  e.m_geometry.set_tensorvisc(ie,tensorvisc);
 }
 
 void init_geopotential_c (const int& ie,

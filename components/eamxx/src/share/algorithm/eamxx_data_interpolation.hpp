@@ -12,6 +12,9 @@
 namespace scream
 {
 
+// Forward declaration
+class IOPDataManager;
+
 class DataInterpolation
 {
 public:
@@ -74,7 +77,8 @@ public:
                               int time_index = -1);
 
   void create_horiz_remappers (const std::string& map_file = "");
-  void create_horiz_remappers (const Real iop_lat, const Real iop_lon);
+  void create_horiz_remappers (const std::string& map_file,
+                               const std::shared_ptr<IOPDataManager>& iop_data_manager);
   void create_vert_remapper ();
   void create_vert_remapper (const VertRemapData& data);
 
@@ -115,6 +119,16 @@ protected:
                                    const util::TimeStamp& ref_ts);
 
   int get_input_files_dimlen (const std::string& dimname) const;
+
+  // Verify (collectively, across m_comm) that all input files can be opened
+  // for reading. Throws the same error on ALL ranks if any rank cannot open
+  // a file, rather than letting a single rank throw while other ranks are
+  // still headed into the collective scorpio::register_file/PIOc_openfile
+  // call below. A per-rank-only check (e.g. a lone rank hitting a transient
+  // filesystem hiccup) can otherwise cause that lone rank to abort while its
+  // peers hang forever inside the collective open, since MPI_Abort on a
+  // sub-communicator is not guaranteed to tear down the other ranks.
+  void check_files_readable (const strvec_t& input_files) const;
 
   // ----------- Internal data types ---------- //
 
