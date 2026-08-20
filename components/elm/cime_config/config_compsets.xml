@@ -490,6 +490,16 @@
     <alias>I20TRCRUCNPRDCTCBC</alias>
     <lname>20TR_DATM%CRU_ELM%CNPRDCTCBC_SICE_SOCN_MOSART_SGLC_SWAV</lname>
    </compset>
+
+   <compset>
+     <alias>I1850TRENDY2026</alias>
+     <lname>1850_DATM%TRNDY26_ELM%CNPRDCTCBCTOP_SICE_SOCN_MOSART_SGLC_SWAV</lname>
+   </compset>
+
+   <compset>
+    <alias>I20TRTRENDY2026</alias>
+    <lname>20TR_DATM%TRNDY26_ELM%CNPRDCTCBCTOP_SICE_SOCN_MOSART_SGLC_SWAV</lname>
+   </compset>
    
    <!---I GSWP3 compsets-->
   <compset>
