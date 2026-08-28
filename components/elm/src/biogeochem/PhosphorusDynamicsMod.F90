@@ -531,19 +531,18 @@ contains
     biochem_pmin_ppools_vr_col(bounds%begc : bounds%endc, :, :) = 0._r8
 
     if(use_fates) then
-        ci = bounds%clump_index
-         max_comps = size(alm_fates%fates(ci)%bc_out(1)%cp_scalar,dim=1)
-        allocate(biochem_pmin_to_plant_vr_patch(max_comps,nlevdecomp))
+       ci = bounds%clump_index
+       max_comps = size(alm_fates%fates(ci)%bc_out(1)%cp_scalar,dim=1)
+       allocate(biochem_pmin_to_plant_vr_patch(max_comps,nlevdecomp))
     else
       !!TODO:  Try to get rid of the allocate statement
        allocate(biochem_pmin_to_plant_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp))
        biochem_pmin_to_plant_patch(bounds%begp:bounds%endp) = 0._r8
+       biochem_pmin_to_plant_vr_patch(:,:) = 0._r8
     end if
-    biochem_pmin_to_plant_vr_patch(:,:) = 0._r8
-
+    
     do fc = 1,num_soilc
         c = filter_soilc(fc)
-
 
         biochem_pmin_vr(c,:) = 0.0_r8
         biochem_pmin_to_ecosysp_vr_col_pot(c,:) = 0._r8
@@ -551,14 +550,17 @@ contains
 
         if(use_fates) then
            s = alm_fates%f2hmap(ci)%hsites(c)
-           do j = 1,nlevdecomp
+           sum_root = sum(alm_fates%fates(ci)%bc_out(s)%veg_rootc(:,:))
+           biochem_pmin_to_plant_vr_patch(:,:) = 0._r8
 
-              do p = 1, alm_fates%fates(ci)%bc_out(s)%num_plant_comps
+           do p = 1, alm_fates%fates(ci)%bc_out(s)%num_plant_comps
 
-                 pft = alm_fates%fates(ci)%bc_out(s)%ft_index(p)
+              pft = alm_fates%fates(ci)%bc_out(s)%ft_index(p)
+              ptase_tmp = alm_fates%fates(ci)%bc_pconst%eca_vmax_ptase(pft) / ( alm_fates%fates(ci)%bc_pconst%eca_km_ptase(pft) + 1._r8)
+              do j = 1,nlevdecomp
                  
                  fr_frac = alm_fates%fates(ci)%bc_out(s)%veg_rootc(p,j) / &
-                      sum(alm_fates%fates(ci)%bc_out(s)%veg_rootc(:,:))
+                      sum_root
 
                  ! lamda is not used currently with fates, fates also does not
                  ! scale by the cn_ and cp_scalars
@@ -566,12 +568,8 @@ contains
                  ! to go directly to the plants in FATES. This implies as an alpha of 0.
                  ! lamda_ptase = alm_fates%fates(ci)%bc_pconst%eca_lambda_ptase(pft)
 
-                 ptase_tmp = alm_fates%fates(ci)%bc_pconst%eca_vmax_ptase(pft) *  &
-                      fr_frac/dzsoi_decomp(j) / ( alm_fates%fates(ci)%bc_pconst%eca_km_ptase(pft) + 1._r8)
-
-                 biochem_pmin_to_plant_vr_patch(p,j) = 0._r8
-                 biochem_pmin_vr(c,j) = biochem_pmin_vr(c,j) + ptase_tmp !*(1._r8 - alm_fates%fates(ci)%bc_pconst%eca_alpha_ptase(pft))
-                 biochem_pmin_to_ecosysp_vr_col_pot(c,j) = biochem_pmin_to_ecosysp_vr_col_pot(c,j) + ptase_tmp
+                 biochem_pmin_vr(c,j) = biochem_pmin_vr(c,j) + ptase_tmp * fr_frac/dzsoi_decomp(j) !*(1._r8 - alm_fates%fates(ci)%bc_pconst%eca_alpha_ptase(pft))
+                 biochem_pmin_to_ecosysp_vr_col_pot(c,j) = biochem_pmin_to_ecosysp_vr_col_pot(c,j) + ptase_tmp * fr_frac/dzsoi_decomp(j)
                end do 
            end do
         else
