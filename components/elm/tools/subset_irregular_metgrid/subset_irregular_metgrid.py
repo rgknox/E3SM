@@ -1,30 +1,30 @@
-# This notebook is intended to re-grid large DATM 
-# datasets for use in ELM runs that either only require
-# a small number of sites, or are production runs.
-# The intent here is to speed up the model
+# Regrid large DATM datasets for ELM runs that require a small number of sites
+# or a regional domain. Supports nearest-neighbor selection by explicit
+# coordinate list ("points" mode) or by reading coordinates from a target
+# domain NetCDF file ("domain" mode).
+#
+# Usage:
+#   python subset_irregular_metgrid.py --config my_config.json [--dry-run] [--yes]
+#
 # Questions: Ryan Knox rgknox@lbl.gov
 
 import sys
 import json
-import runpy
+import argparse
+
 import numpy as np
 import xarray as xr
-import sys
 import os
-import warnings
-import matplotlib.pyplot as plt # Import matplotlib for inline plotting
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-# Here are the components as listed in a datm_in from a pre-industrial run:
-#streams = "datm.streams.txt.CLMGSWP3v1.Solar 1 1948 1972",
-#      "datm.streams.txt.CLMGSWP3v1.Precip 1 1948 1972",
-#      "datm.streams.txt.CLMGSWP3v1.TPQW 1 1948 1972",
-#      "datm.streams.txt.presaero.clim_1850 1 1 1",
-#      "datm.streams.txt.topo.observed 1 1 1"
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_DEFAULT_STREAM_LIST_FILE = (
+    _SCRIPT_DIR / "../../../data_comps/datm/cime_config/namelist_definition_datm.xml"
+).resolve()
 
 
-def GetXmlVals(root,group_str,tag_id_name,tag_name):
+def GetXmlVals(root, group_str, tag_id_name, tag_name):
 
     text_list = []
     entry = f"./entry[@id='{group_str}']"
@@ -32,73 +32,51 @@ def GetXmlVals(root,group_str,tag_id_name,tag_name):
     if streams_entry is None:
         print('big problems, no strealist?')
     else:
-        # Find all <value> tags inside this specific entry
         value_tags = streams_entry.findall('.//value')
         for val in value_tags:
             mode_attr = val.attrib.get(tag_id_name, '')
-            if(tag_name=='list'):
-                # Collect every defined mode attribute
+            if tag_name == 'list':
                 if mode_attr:
                     print(mode_attr)
-            else:            
-                # If it matches the one we want, split the comma-separated text into a list
+            else:
                 if mode_attr == tag_name and val.text:
                     text_list = [stream.strip() for stream in val.text.split(',')]
-                    
+
     return text_list
+
 
 def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
     """
-    Identify spatial indices in a dataset that are nearest to the lat-lon list
-    provided.  This can work on any dataset that has geographic coordinates
-    specified by LATIXY and LONGXY.
-    
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Input dataset with LATIXY and LONGXY variables defining grid coordinates.
-    target_lats : list
-        List of target latitude coordinates.
-    target_lons : list
-        List of target longitude coordinates.
-    
-    Returns integer vectors of lat/lon indices pairs
-    -------
+    Identify spatial indices in a dataset nearest to the provided lat-lon list.
+    Works on any dataset with LATIXY and LONGXY coordinate variables.
 
+    Returns integer vectors of (lat_indices, lon_indices) pairs.
     """
-    # Extract the 2D coordinate arrays
-    latixy = ds["LATIXY"].values  # shape (lat, lon)
-    longxy = ds["LONGXY"].values  # shape (lat, lon)
-    
-    # --- normalize longitude convention -------------------------------
+    latixy = ds["LATIXY"].values
+    longxy = ds["LONGXY"].values
+
     domain_max_lon = np.nanmax(longxy)
     if domain_max_lon > 180.0:
         print(f"--> Detected Surface Convention: 0 to 360 (Max lon: {domain_max_lon:.2f})")
         target_lons_adjusted = np.array(target_lons) % 360
-        
     else:
         print(f"--> Detected Surface Convention: -180 to 180 (Max lon: {domain_max_lon:.2f})")
         target_lons_adjusted = ((np.array(target_lons) + 180) % 360) - 180
     target_lats = np.array(target_lats)
-    
+
     lat_indices = []
     lon_indices = []
 
     for tlat, tlon in zip(target_lats, target_lons_adjusted):
-        # Compute distance (simple Euclidean in lat/lon space)
-        # For more accuracy over large distances, use haversine instead
         dist = np.sqrt((latixy - tlat) ** 2 + (longxy - tlon) ** 2)
         idx = np.unravel_index(np.argmin(dist), dist.shape)
         lat_indices.append(idx[0])
         lon_indices.append(idx[1])
 
-    #rows = xr.DataArray(lat_indices, dims="points")
-    #cols = xr.DataArray(lon_indices, dims="points")
-    #matched_longxy = ds.LONGXY.isel(x=rows, y=cols)
-    #print(f"base lon: {matched_longxy}")
-    print(f"base lon: {ds.LONGXY.isel(lat=lat_indices[0],lon=lon_indices[0]).values}")
-    
-    return lat_indices,lon_indices
+    print(f"base lon: {ds.LONGXY.isel(lat=lat_indices[0], lon=lon_indices[0]).values}")
+
+    return lat_indices, lon_indices
+
 
 def RegridSurface(base_ds: xr.Dataset,
                   target_lats: list,
@@ -108,23 +86,13 @@ def RegridSurface(base_ds: xr.Dataset,
     """
     Subset a surface dataset by nearest-neighbor matching to a list of
     (lat, lon) target points, collapsing the two spatial dimensions
-    (lsmlat, lsmlon) into a single 'gridcell' dimension of length N
-    (ELM vector layout).
-
-    Coordinate fields are LATIXY (degrees north) and LONGXY
-    (degrees east), both shaped (lsmlat, lsmlon). lsmlat/lsmlon are the
-    trailing dimensions on all spatial variables, so higher-dimensional
-    variables (e.g. CV_IMPROAD(nlevurb, lsmlat, lsmlon)) keep their
-    leading dims and gain a single trailing 'gridcell' dim.
+    into a single 'gridcell' dimension (ELM vector layout).
     """
-
-    # --- coordinate meshes --------------------------------------------
-    lat_mesh = base_ds["LATIXY"].values   # Shape: (lsmlat, lsmlon)
-    lon_mesh = base_ds["LONGXY"].values   # Shape: (lsmlat, lsmlon)
+    lat_mesh = base_ds["LATIXY"].values
+    lon_mesh = base_ds["LONGXY"].values
 
     print(f"base lon range:{np.min(lon_mesh)} {np.max(lon_mesh)}")
-    
-    # --- normalize longitude convention -------------------------------
+
     domain_max_lon = np.nanmax(lon_mesh)
     if domain_max_lon > 180.0:
         print(f"--> Detected Surface Convention: 0 to 360 (Max lon: {domain_max_lon:.2f})")
@@ -135,14 +103,12 @@ def RegridSurface(base_ds: xr.Dataset,
 
     target_lats = np.array(target_lats)
 
-    # --- nearest-neighbor index search --------------------------------
     matched_lat_indices = []
     matched_lon_indices = []
 
     for t_lat, t_lon in zip(target_lats, target_lons_adjusted):
         diff_squared = (lat_mesh - t_lat) ** 2 + (lon_mesh - t_lon) ** 2
-        lat_idx, lon_idx = np.unravel_index(np.argmin(diff_squared),
-                                            diff_squared.shape)
+        lat_idx, lon_idx = np.unravel_index(np.argmin(diff_squared), diff_squared.shape)
         print(f"pulling lat: {lat_mesh[lat_idx, lon_idx]:.4f}, "
               f"lon: {lon_mesh[lat_idx, lon_idx]:.4f}")
         matched_lat_indices.append(lat_idx)
@@ -151,328 +117,330 @@ def RegridSurface(base_ds: xr.Dataset,
     lat_indices = np.array(matched_lat_indices)
     lon_indices = np.array(matched_lon_indices)
 
-    # --- pointwise selection -> single 'gridcell' dim -----------------
-    # Sharing one dim name on both index arrays triggers vectorized
-    # (pointwise) selection, collapsing lsmlat/lsmlon to 'gridcell'.
     lat_da = xr.DataArray(lat_indices, dims="gridcell")
     lon_da = xr.DataArray(lon_indices, dims="gridcell")
 
     new_ds = base_ds.isel({lat_name: lat_da, lon_name: lon_da})
-    
+
     print(f"new surface lats: {new_ds['LATIXY'].values}, lons:{new_ds['LONGXY'].values}")
-    
+
     return new_ds
 
-    
-    
 
 def RegridMet(ds: xr.Dataset, lat_indices: list, lon_indices: list) -> xr.Dataset:
     """
-    Subset a dataset. This assumes that the desired points have already
-    been identified. Data arrays with dimensions "lat" and "lon" will be subset using the
-    index lists provided, all other data arrays will simply be copies
-    of the original data array provided. Note that the new lat dim will
-    be of LENGTH 1, and the lon dim will be: len(target_lats).
-    
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Input dataset with LATIXY and LONGXY variables defining grid coordinates.
-    target_lats : list
-        List of target latitude coordinates.
-    target_lons : list
-        List of target longitude coordinates.
-    
-    Returns
-    -------
-    xr.Dataset
-        New dataset with lat dim = 1 and lon dim = len(target_lats),
-        containing only the nearest neighbor grid points.
+    Subset a meteorological dataset at pre-identified grid point indices.
+
+    Variables with "lat" and "lon" dimensions are extracted at the specified
+    index pairs and stacked into a new dataset with lat=1 and lon=N_points.
+    All other variables are passed through unchanged.
     """
-    
-    # Extract data at the selected grid points
     data_vars = {}
 
     for var in ds.data_vars:
         da = ds[var]
 
         if "lat" in da.dims and "lon" in da.dims:
-            # Gather slices at each selected point
             slices = [
                 da.isel(lat=li, lon=loi).values
                 for li, loi in zip(lat_indices, lon_indices)
             ]
-            # Stack along a new axis to form the new "lon" dimension
-            # Each slice has shape (time,) or () depending on the variable
-            stacked = np.stack(slices, axis=-1)  # shape: (time, n_points) or (n_points,)
+            stacked = np.stack(slices, axis=-1)
 
-            # Build new dims: replace lat/lon with lat=1, lon=n_points
             other_dims = [d for d in da.dims if d not in ("lat", "lon")]
             new_dims = other_dims + ["lat", "lon"]
 
-            # Add the lat=1 dimension
-            stacked = stacked[..., np.newaxis, :]  # shape: (..., 1, n_points)
+            stacked = stacked[..., np.newaxis, :]
 
             data_vars[var] = xr.DataArray(stacked, dims=new_dims)
 
         elif "lat" in da.dims or "lon" in da.dims:
-            # Edge case: variable has only one of lat or lon — just pass through
             data_vars[var] = da
 
         else:
-            # No spatial dimensions (e.g., scalar or time-only vars)
             data_vars[var] = da
 
-    # Build coordinates for the new dataset
     new_coords = {}
     if "time" in ds.coords:
         new_coords["time"] = ds.coords["time"]
 
-    new_ds = xr.Dataset(data_vars, coords=new_coords)
+    return xr.Dataset(data_vars, coords=new_coords)
 
-    return new_ds
 
-def RegridDomain(base_ds : xr.Dataset, lat_points: list, lon_points: list) -> xr.Dataset:
-
+def RegridDomain(base_ds: xr.Dataset, lat_points: list, lon_points: list) -> xr.Dataset:
     """
-    Subset a domain dataset. Similar to Regrid(), but for domain files
-    which have different conventions for spatial indexing and
-    coordinate names (ie nj,ni, etc)
+    Subset a domain dataset (nj/ni conventions, xc/yc coordinate variables)
+    by nearest-neighbor matching.
     """
-    
-    #<xarray.Dataset> Size: 24MB
-    #Dimensions:  (nj: 360, ni: 720, nv: 4)
-    #Dimensions without coordinates: nj, ni, nv
-    #Data variables:
-    #    xc       (nj, ni) float64 2MB ...
-    #    yc       (nj, ni) float64 2MB ...
-    #    xv       (nv, nj, ni) float64 8MB ...
-    #    yv       (nv, nj, ni) float64 8MB ...
-    #    mask     (nj, ni) int32 1MB ...
-    #    area     (nj, ni) float64 2MB ...
-    #Attributes:
-    #    case_title:  GSWP3 3-Hourly Atmospheric Forcing
-    #lon_2d = ds["xc"].values
-    #lat_2d = ds["yc"].values
-    
-    # Extract the coordinate meshes for index mapping
-    lat_mesh = base_ds["yc"].values  # Shape: (nj,ni)
-    lon_mesh = base_ds["xc"].values  # Shape: (nj,ni)
+    lat_mesh = base_ds["yc"].values
+    lon_mesh = base_ds["xc"].values
 
     domain_max_lon = np.nanmax(lon_mesh)
     if domain_max_lon > 180.0:
         print(f"--> Detected Domain Convention: 0 to 360 (Max lon found: {domain_max_lon:.2f})")
-        # Convert input targets to 0-360
         target_lons_adjusted = np.array(lon_points) % 360
     else:
         print(f"--> Detected Domain Convention: -180 to 180 (Max lon found: {domain_max_lon:.2f})")
-        # Convert input targets to -180 to 180
         target_lons_adjusted = ((np.array(lon_points) + 180) % 360) - 180
-        
+
     lat_points = np.array(lat_points)
-    
-    # -----------------------------------------------------------------
-    # STEP A: Map target coordinates to raw 2D index pairs
-    # -----------------------------------------------------------------
+
     matched_lat_indices = []
     matched_lon_indices = []
 
     for t_lat, t_lon in zip(lat_points, target_lons_adjusted):
-
         diff_squared = (lat_mesh - t_lat) ** 2 + (lon_mesh - t_lon) ** 2
         lat_idx, lon_idx = np.unravel_index(np.argmin(diff_squared), diff_squared.shape)
-
         matched_lat_indices.append(lat_idx)
         matched_lon_indices.append(lon_idx)
-    
-    # Convert lists to NumPy arrays for advanced indexing
+
     lat_indices = np.array(matched_lat_indices)
     lon_indices = np.array(matched_lon_indices)
 
-    # 1. Reshape the 1D index arrays into 2D arrays with shape (1, number_of_points)
-    nj_indices_2d = lat_indices.reshape(1, -1)  # Shape: (1, N)
-    ni_indices_2d = lon_indices.reshape(1, -1)  # Shape: (1, N)
+    nj_indices_2d = lat_indices.reshape(1, -1)
+    ni_indices_2d = lon_indices.reshape(1, -1)
 
-    # 2. Convert them to xarray DataArrays, explicitly naming the target dimensions.
-    # This forces xarray to map the extracted data to 'nj' and 'ni'.
     nj_da = xr.DataArray(nj_indices_2d, dims=("nj", "ni"))
     ni_da = xr.DataArray(ni_indices_2d, dims=("nj", "ni"))
 
-    # 3. Use advanced indexing to slice the original domain file
-    # 2D variables will be (1, ni); 3D variables will automatically become (nv, 1, ni)
-    new_ds = base_ds.isel(nj=nj_da, ni=ni_da)
-    
-    return new_ds
+    return base_ds.isel(nj=nj_da, ni=ni_da)
 
-def TrimDinLoc(text_str):
 
-    # Remove the DIN_LOC strings...
-    
+def GetCoordsFromDomain(domain_file: str):
+    """
+    Extract (lat, lon) coordinate pairs from a domain NetCDF file.
+
+    Reads yc/xc coordinate arrays and filters to cells where mask == 1
+    (if a mask variable is present).
+
+    Returns (lat_list, lon_list) as Python lists.
+    """
+    ds = xr.open_dataset(domain_file, engine='netcdf4')
+    yc = ds['yc'].values.flatten()
+    xc = ds['xc'].values.flatten()
+    mask = ds.get('mask')
+    if mask is not None:
+        valid = mask.values.flatten().astype(bool)
+        yc = yc[valid]
+        xc = xc[valid]
+    ds.close()
+    return yc.tolist(), xc.tolist()
+
+
+def TrimDinLoc(text_str: str,
+               din_loc_root: str,
+               din_loc_root_clmforc: str,
+               new_loc_root: str,
+               new_loc_root_clmforc: str):
+    """
+    Split a path string at a DIN_LOC token and return the path suffix,
+    the original base path, and the replacement base path.
+    """
     if '$DIN_LOC_ROOT_CLMFORC' in text_str:
         path_end = text_str.split('$DIN_LOC_ROOT_CLMFORC')[1]
         path_base = din_loc_root_clmforc
         new_path_base = new_loc_root_clmforc
+    elif '$DIN_LOC_ROOT' in text_str:
+        path_end = text_str.split('$DIN_LOC_ROOT')[1]
+        path_base = din_loc_root
+        new_path_base = new_loc_root
     else:
-        if '$DIN_LOC_ROOT' in text_str:
-            path_end = text_str.split('$DIN_LOC_ROOT')[1]
-            path_base = din_loc_root
-            new_path_base = new_loc_root
-        else:
-            print('stream dir NOT found')
-            exit(2)
+        print('stream dir NOT found')
+        sys.exit(2)
 
-    return path_end,path_base,new_path_base
-    
+    return path_end, path_base, new_path_base
 
 
-# 1) Read in user input
-# 3) Create file structure
-# 4) Create atm domain file
-# 5) Perform regridding
+def validate_config(config: dict):
+    required_always = [
+        "din_loc_root", "din_loc_root_clmforc",
+        "new_loc_root", "new_loc_root_clmforc",
+        "target_mode", "target_coords_mode",
+    ]
+    for key in required_always:
+        if key not in config:
+            raise ValueError(f"Config missing required field: '{key}'")
 
-# GSWP3->ZF2
-din_loc_root = '/dvs_ro/cfs/cdirs/e3sm/inputdata/' 
-din_loc_root_clmforc = '/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/' 
+    if not config.get("base_lnd_domain"):
+        raise ValueError("'base_lnd_domain' is required in all modes")
 
-new_loc_root = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/'
-new_loc_root_clmforc = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/atm/datm7'
-
-
-din_loc_root_clmforc = '/pscratch/sd/r/rgknox/trendy_data/met_datm/'
-new_loc_root_clmforc = '/pscratch/sd/r/rgknox/trendy_data/met_datm_f19/'
-
-stream_list_file = '/global/homes/r/rgknox/E3SM/components/data_comps/datm/cime_config/namelist_definition_datm.xml'
-
-# Surface and LND domain Files
-# Note that 
-# It might be useful to convert several surface files,
-# like if you are running both pre and post industrial
-# domain files are here: /global/cfs/cdirs/e3sm/inputdata/share/domains
-
-base_lnd_domain = '/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.360x720cru_oRRS15to5.190514.nc'
-
-base_surf_files = ['/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr2000_c180216.nc',
-                   '/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr1850_c180216.nc']
-
-base_surf_files = []
+    mode = config["target_coords_mode"]
+    if mode == "points":
+        if not config.get("lat_list") or not config.get("lon_list"):
+            raise ValueError("'lat_list' and 'lon_list' are required when target_coords_mode is 'points'")
+        if len(config["lat_list"]) != len(config["lon_list"]):
+            raise ValueError("'lat_list' and 'lon_list' must have the same length")
+    elif mode == "domain":
+        if not config.get("target_domain_file"):
+            raise ValueError("'target_domain_file' is required when target_coords_mode is 'domain'")
+    else:
+        raise ValueError(f"Unknown target_coords_mode: '{mode}'. Must be 'points' or 'domain'")
 
 
-#target_mode = "ELMGSWP3w5e5"
-target_mode = "CLMGSWP3v1"
-
-target_mode = "TRENDY2026"
-
-lat_list = [-2.593611]
-lon_list = [-60.208611]
-
-
-# 2) Read in namelist definitions for the domain file
-# Why do we also make a copy of the met domain file, instead of
-# re-using the existing one? because I don't want to mess
-# with the stream file definitions, this keeps them simpler
-# by simply updating the DIN_LOC etc...
+def _confirm(prompt: str, yes: bool) -> bool:
+    if yes:
+        print(f"{prompt} [auto-yes]")
+        return True
+    response = input(f"{prompt} (Y/N): ").strip().lower()
+    return response == "y"
 
 
-tree = ET.parse(stream_list_file)
-stream_root = tree.getroot()
-domain_dir = GetXmlVals(stream_root,"strm_domdir","stream",target_mode)
-domain_file = GetXmlVals(stream_root,"strm_domfil","stream",target_mode)
-domain_end,domain_base,new_domain_base = TrimDinLoc(domain_dir[0]+'/'+domain_file[0])
-new_domain_file = new_domain_base+domain_end
-new_domain_path = Path(new_domain_file)
-new_domain_dir = str(new_domain_path.parent)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Regrid DATM meteorological data to a subset of grid points for ELM runs."
+    )
+    parser.add_argument(
+        "--config", required=True,
+        help="Path to JSON configuration file"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", default=False,
+        help="Print what would be done without writing any output files"
+    )
+    parser.add_argument(
+        "--yes", "-y", action="store_true", default=False,
+        help="Skip all interactive confirmation prompts"
+    )
+    args = parser.parse_args()
 
-print(f"Will create directory: '{new_domain_dir}'")
-print(f" for modified version of domain file: {domain_end}")
-response = input("Continue? (Y/N): ").strip().lower()
+    with open(args.config, "r") as f:
+        config = json.load(f)
 
-if response != "y":
-    print("Exiting.")
-    sys.exit()
+    validate_config(config)
 
-new_domain_path.parent.mkdir(parents=True, exist_ok=True)
+    dry_run = args.dry_run or config.get("dry_run", False)
+    yes = args.yes
 
-base_ds = xr.open_dataset(base_lnd_domain,engine='netcdf4')
-atm_base_ds = xr.open_dataset(domain_base+domain_end,engine='netcdf4')
-new_ds = RegridDomain(base_ds,lat_list,lon_list)
-new_ds.to_netcdf(new_domain_file)
+    din_loc_root           = config["din_loc_root"]
+    din_loc_root_clmforc   = config["din_loc_root_clmforc"]
+    new_loc_root           = config["new_loc_root"]
+    new_loc_root_clmforc   = config["new_loc_root_clmforc"]
+    target_mode            = config["target_mode"]
+    target_coords_mode     = config["target_coords_mode"]
+    base_surf_files        = config.get("base_surf_files", [])
 
-print(f"Creating new domain dataset:\n")
-print(new_ds)
-response = input("Continue? (Y/N): ").strip().lower()
-if response != "y":
-    print("Exiting.")
-    sys.exit()
+    stream_list_file = config.get("stream_list_file") or str(_DEFAULT_STREAM_LIST_FILE)
+    print(f"Using stream list file: {stream_list_file}")
 
-base_ds.close()
-new_ds.close()
+    # --- Determine target coordinates ---
+    if target_coords_mode == "points":
+        lat_list = config["lat_list"]
+        lon_list = config["lon_list"]
+        print(f"Mode: points ({len(lat_list)} point(s))")
+    else:
+        print(f"Mode: domain — reading coordinates from {config['target_domain_file']}")
+        lat_list, lon_list = GetCoordsFromDomain(config["target_domain_file"])
+        print(f"Loaded {len(lat_list)} target point(s) from domain file")
 
-# lets convert the surface files and put them with the domain file
-for base_surf_file in base_surf_files:
-    base_surf_path = Path(base_surf_file)
-    surf_file_name = base_surf_path.name
-    # Put the new surface files next to the domain file
-    new_surf_file = new_domain_dir+'/'+surf_file_name
-    
-    base_ds = xr.open_dataset(base_surf_file,engine='netcdf4')
-    new_ds = RegridSurface(base_ds,lat_list,lon_list)
-    print(f"Creating new surface dataset: {new_surf_file}\n")
-    print(new_ds)
-    response = input("Continue? (Y/N): ").strip().lower()
-    if response != "y":
+    # --- Parse stream XML ---
+    tree = ET.parse(stream_list_file)
+    stream_root = tree.getroot()
+
+    domain_dir  = GetXmlVals(stream_root, "strm_domdir", "stream", target_mode)
+    domain_file = GetXmlVals(stream_root, "strm_domfil", "stream", target_mode)
+    domain_end, domain_base, new_domain_base = TrimDinLoc(
+        domain_dir[0] + '/' + domain_file[0],
+        din_loc_root, din_loc_root_clmforc, new_loc_root, new_loc_root_clmforc
+    )
+    new_domain_file = os.path.join(new_domain_base, domain_end.lstrip('/'))
+    new_domain_path = Path(new_domain_file)
+    new_domain_dir  = str(new_domain_path.parent)
+
+    print(f"\nWill create directory: '{new_domain_dir}'")
+    print(f"  for modified domain file: {domain_end}")
+    if not _confirm("Continue?", yes):
         print("Exiting.")
         sys.exit()
-    
-    new_ds.to_netcdf(new_surf_file)
 
-# Now, for the met data,
-# 1) Identify the streams needed from the configuration
-# 2) go through those streams and create the folders for the new output
-# 3) find the indices we will pull from by querying the first file
-# 4) go through and convert all files in those directories and put result in new folders
+    if not dry_run:
+        new_domain_path.parent.mkdir(parents=True, exist_ok=True)
 
-stream_list = GetXmlVals(stream_root,"streamslist","datm_mode",target_mode)
-#GetXmlVals(root,"strm_datdir","stream","list")
+    # --- Create output domain file ---
+    # Always subset base_lnd_domain to the target points so the output domain
+    # has the same nj=1/ni=N vector layout as the output met data.
+    base_lnd_domain = config["base_lnd_domain"]
+    print(f"\nWill subset domain: {base_lnd_domain}")
+    print(f"  -> {new_domain_file}")
+    if not _confirm("Continue?", yes):
+        print("Exiting.")
+        sys.exit()
+    if not dry_run:
+        base_ds = xr.open_dataset(base_lnd_domain, engine='netcdf4')
+        new_ds = RegridDomain(base_ds, lat_list, lon_list)
+        new_ds.to_netcdf(new_domain_file)
+        base_ds.close()
+        new_ds.close()
 
-dry_run = False
+    # --- Convert surface files ---
+    for base_surf_file in base_surf_files:
+        base_surf_path = Path(base_surf_file)
+        new_surf_file = new_domain_dir + '/' + base_surf_path.name
 
-stream_paths = []
-for stream in stream_list:
+        print(f"\nWill subset surface: {base_surf_file}")
+        print(f"  -> {new_surf_file}")
+        if not _confirm("Continue?", yes):
+            print("Exiting.")
+            sys.exit()
+        if not dry_run:
+            base_ds = xr.open_dataset(base_surf_file, engine='netcdf4')
+            new_ds = RegridSurface(base_ds, lat_list, lon_list)
+            new_ds.to_netcdf(new_surf_file)
 
-    stream_dir = GetXmlVals(stream_root,"strm_datdir","stream",stream)
+    # --- Regrid met data streams ---
+    stream_list = GetXmlVals(stream_root, "streamslist", "datm_mode", target_mode)
 
-    stream_path_end,stream_path_base,new_path_base = TrimDinLoc(stream_dir[0])
+    for stream in stream_list:
+        stream_dir = GetXmlVals(stream_root, "strm_datdir", "stream", stream)
+        stream_path_end, stream_path_base, new_path_base = TrimDinLoc(
+            stream_dir[0],
+            din_loc_root, din_loc_root_clmforc, new_loc_root, new_loc_root_clmforc
+        )
 
-    stream_path_dir = stream_path_base+stream_path_end
-    stream_path = Path(stream_path_dir)
-    new_path_dir = new_path_base+stream_path_end
-    new_path = Path(new_path_dir)
+        stream_path_dir = os.path.join(stream_path_base, stream_path_end.lstrip('/'))
+        new_path_dir    = os.path.join(new_path_base, stream_path_end.lstrip('/'))
+        new_path        = Path(new_path_dir)
 
-    if os.path.isdir(new_path_dir):
-        print('folder: '+str(new_path.parent)+' already exists, continuing')
-    else:
-        new_path.mkdir(parents=True)
-        print('creating folder: '+new_path_dir)
+        if os.path.isdir(new_path_dir):
+            print(f"Folder exists: {new_path_dir}")
+        else:
+            print(f"{'[dry-run] Would create' if dry_run else 'Creating'} folder: {new_path_dir}")
+            if not dry_run:
+                new_path.mkdir(parents=True)
 
-    if not os.path.isdir(stream_path_dir):
-        print(f"Critical error, cannot find stream path: {stream_path_dir}")
-        exit(2)
+        if not os.path.isdir(stream_path_dir):
+            if dry_run:
+                print(f"  [dry-run] Source stream path not found (expected on non-NERSC): {stream_path_dir}")
+                continue
+            print(f"Critical error, cannot find stream path: {stream_path_dir}")
+            sys.exit(2)
 
-    # Loop only through NetCDF files
-    for ifp,file_path in enumerate(stream_path.glob("clmforc*.nc")):
+        if dry_run:
+            nc_files = sorted(Path(stream_path_dir).glob("clmforc*.nc"))
+            print(f"  Would convert {len(nc_files)} file(s) from {stream_path_dir}")
+            for fp in nc_files:
+                print(f"    {fp.name} -> {new_path_dir}/{fp.name}")
+            continue
 
-        base_file_path = stream_path_dir+'/'+file_path.name
-        new_file_path = new_path_dir+'/'+file_path.name
+        lat_indices = None
+        lon_indices = None
 
-        print(f"Converting: {file_path.name} to {new_file_path}")
+        for ifp, file_path in enumerate(Path(stream_path_dir).glob("clmforc*.nc")):
+            base_file_path = stream_path_dir + '/' + file_path.name
+            new_file_path  = new_path_dir + '/' + file_path.name
 
-        base_ds = xr.open_dataset(base_file_path,engine='netcdf4')
-        if(ifp==0):
-            lat_indices,lon_indices = RegridToPoints(base_ds, lat_list, lon_list) 
-        if(not dry_run):
-            new_ds = RegridMet(base_ds,lat_indices,lon_indices)
+            print(f"Converting: {file_path.name} -> {new_file_path}")
 
+            base_ds = xr.open_dataset(base_file_path, engine='netcdf4')
+            if ifp == 0:
+                lat_indices, lon_indices = RegridToPoints(base_ds, lat_list, lon_list)
+
+            new_ds = RegridMet(base_ds, lat_indices, lon_indices)
             new_ds.to_netcdf(new_file_path)
+            new_ds.close()
             base_ds.close()
-            new_ds.close()    
 
+    print("\nDone.")
+
+
+if __name__ == "__main__":
+    main()
