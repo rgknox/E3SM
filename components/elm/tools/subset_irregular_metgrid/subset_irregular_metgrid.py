@@ -330,12 +330,16 @@ def TrimDinLoc(text_str):
 # 4) Create atm domain file
 # 5) Perform regridding
 
-
+# GSWP3->ZF2
 din_loc_root = '/dvs_ro/cfs/cdirs/e3sm/inputdata/' 
 din_loc_root_clmforc = '/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/' 
 
 new_loc_root = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/'
 new_loc_root_clmforc = '/global/cfs/cdirs/m2420/rgknox/site_drivers/ZF2.4/inputdata/atm/datm7'
+
+
+din_loc_root_clmforc = '/pscratch/sd/r/rgknox/trendy_data/met_datm/'
+new_loc_root_clmforc = '/pscratch/sd/r/rgknox/trendy_data/met_datm_f19/'
 
 stream_list_file = '/global/homes/r/rgknox/E3SM/components/data_comps/datm/cime_config/namelist_definition_datm.xml'
 
@@ -350,8 +354,13 @@ base_lnd_domain = '/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.360
 base_surf_files = ['/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr2000_c180216.nc',
                    '/dvs_ro/cfs/cdirs/e3sm/inputdata/lnd/clm2/surfdata_map/surfdata_360x720cru_simyr1850_c180216.nc']
 
+base_surf_files = []
+
+
 #target_mode = "ELMGSWP3w5e5"
 target_mode = "CLMGSWP3v1"
+
+target_mode = "TRENDY2026"
 
 lat_list = [-2.593611]
 lon_list = [-60.208611]
