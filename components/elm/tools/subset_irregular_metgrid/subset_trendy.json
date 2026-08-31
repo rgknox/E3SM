@@ -1,0 +1,51 @@
+{
+    "_comment_intro": [
+        "Configuration file for subset_irregular_metgrid.py.",
+        "Run: python subset_irregular_metgrid.py --config this_file.json [--dry-run] [--yes]",
+        "",
+        "target_coords_mode controls how target points are determined:",
+        "  'points' - explicit lat_list / lon_list arrays",
+        "  'domain' - read yc/xc coordinates from target_domain_file",
+        "",
+        "stream_list_file: path to namelist_definition_datm.xml.",
+        "  Leave null to use the default relative to this script:",
+        "  ../../data_comps/datm/cime_config/namelist_definition_datm.xml"
+    ],
+    "_target_mode": "CLMGSWP3v1",
+    "_target_mode": "TRENDY2026",
+    "_base_lnd_domain": "/global/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.360x720cru_oRRS15to5.190514.nc",
+    
+    "din_loc_root": "/dvs_ro/cfs/cdirs/e3sm/inputdata/",
+    "din_loc_root_clmforc": "/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/",
+    "new_loc_root": "/global/cfs/cdirs/m2420/rgknox/site_drivers/ne4/inputdata/",
+    "new_loc_root_clmforc": "/global/cfs/cdirs/m2420/rgknox/site_drivers/ne4",
+    "stream_list_file": "/global/homes/r/rgknox/E3SM/components/data_comps/datm/cime_config/namelist_definition_datm.xml",
+    "target_mode": "CLM_QIAN",
+    
+    "_comment_surf": "base_surf_files: list of surface dataset paths to subset (may be empty list [])",
+    "base_surf_files": [],
+
+    "_comment_mode": "--- CHOOSE ONE MODE BELOW (comment out the other) ---",
+
+    "_comment_points_mode": "POINTS MODE: explicit coordinate list",
+    
+    "target_coords_mode": "domain",
+    "target_domain_file": "/dvs_ro/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.ne4pg2_oQU240.190321.nc",
+    
+    "_comment_out": [{"lat_list": [-2.593611]},
+		     {"lon_list": [-60.208611]} ],
+    
+    "base_lnd_domain": "/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/domain.T62.050609.nc",
+
+    "_comment_domain_mode": [
+        "DOMAIN MODE: set target_coords_mode to 'domain' and provide target_domain_file.",
+        "base_lnd_domain is still required — it is subsetted using coordinates read from",
+        "target_domain_file so the output domain has the same nj=1/ni=N vector layout",
+        "as the output met data.",
+        "",
+        "  'target_coords_mode': 'domain',",
+        "  'target_domain_file': '/dvs_ro/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.ne4pg2_oQU240.190321.nc"
+    ],
+
+    "dry_run": false
+}

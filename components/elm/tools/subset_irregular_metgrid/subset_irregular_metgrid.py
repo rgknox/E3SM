@@ -11,7 +11,7 @@
 import sys
 import json
 import argparse
-
+import re
 import numpy as np
 import xarray as xr
 import os
@@ -23,8 +23,38 @@ _DEFAULT_STREAM_LIST_FILE = (
     _SCRIPT_DIR / "../../../data_comps/datm/cime_config/namelist_definition_datm.xml"
 ).resolve()
 
-
 def GetXmlVals(root, group_str, tag_id_name, tag_name):
+    entry = root.find(f"./entry[@id='{group_str}']")
+    if entry is None:
+        raise KeyError(f"No <entry id='{group_str}'> in stream list file")
+
+    if tag_name == 'list':
+        for val in entry.findall('.//value'):
+            if val.attrib.get(tag_id_name):
+                print(val.attrib[tag_id_name])
+        return []
+
+    match, fallback = None, None
+    for val in entry.findall('.//value'):
+        text = (val.text or '').strip()
+        if not text:
+            continue
+        pattern = val.attrib.get(tag_id_name)
+        if pattern is None:
+            fallback = text
+        elif re.search(pattern, tag_name):
+            match = text          # last match wins, as CIME does
+
+    result = match if match is not None else fallback
+    if result is None:
+        patterns = sorted({p for v in entry.findall('.//value')
+                           if (p := v.attrib.get(tag_id_name))})
+        raise KeyError(f"No value in '{group_str}' matches "
+                       f"{tag_id_name}='{tag_name}'. Patterns: {patterns}")
+    return [s.strip() for s in result.split(',')]
+
+
+def GetXmlValsOld(root, group_str, tag_id_name, tag_name):
 
     text_list = []
     entry = f"./entry[@id='{group_str}']"
@@ -336,8 +366,12 @@ def main():
     tree = ET.parse(stream_list_file)
     stream_root = tree.getroot()
 
-    domain_dir  = GetXmlVals(stream_root, "strm_domdir", "stream", target_mode)
-    domain_file = GetXmlVals(stream_root, "strm_domfil", "stream", target_mode)
+    stream_list = GetXmlVals(stream_root, "streamslist", "datm_mode", target_mode)
+    print(f"Streams for mode '{target_mode}': {stream_list}")
+
+    domain_dir  = GetXmlVals(stream_root, "strm_domdir", "stream", stream_list[0])
+    domain_file = GetXmlVals(stream_root, "strm_domfil", "stream", stream_list[0])
+    
     domain_end, domain_base, new_domain_base = TrimDinLoc(
         domain_dir[0] + '/' + domain_file[0],
         din_loc_root, din_loc_root_clmforc, new_loc_root, new_loc_root_clmforc
@@ -347,7 +381,8 @@ def main():
     new_domain_dir  = str(new_domain_path.parent)
 
     print(f"\nWill create directory: '{new_domain_dir}'")
-    print(f"  for modified domain file: {domain_end}")
+    print(f"  for modified domain file: {new_domain_path.name}")
+    print(f"  full path: {new_domain_file}")
     if not _confirm("Continue?", yes):
         print("Exiting.")
         sys.exit()
@@ -389,6 +424,11 @@ def main():
     # --- Regrid met data streams ---
     stream_list = GetXmlVals(stream_root, "streamslist", "datm_mode", target_mode)
 
+    print(f"Streams for mode '{target_mode}': {stream_list}")
+
+    domain_dir  = GetXmlVals(stream_root, "strm_domdir", "stream", stream_list[0])
+    domain_file = GetXmlVals(stream_root, "strm_domfil", "stream", stream_list[0])
+    
     for stream in stream_list:
         stream_dir = GetXmlVals(stream_root, "strm_datdir", "stream", stream)
         stream_path_end, stream_path_base, new_path_base = TrimDinLoc(
@@ -424,20 +464,30 @@ def main():
         lat_indices = None
         lon_indices = None
 
-        for ifp, file_path in enumerate(Path(stream_path_dir).glob("clmforc*.nc")):
-            base_file_path = stream_path_dir + '/' + file_path.name
-            new_file_path  = new_path_dir + '/' + file_path.name
 
-            print(f"Converting: {file_path.name} -> {new_file_path}")
+        failed = []
+        for ifp, file_path in enumerate(sorted(Path(stream_path_dir).glob("clmforc*.nc"))):
+            base_file_path = str(file_path)
+            new_file_path = new_path_dir + '/' + file_path.name
 
-            base_ds = xr.open_dataset(base_file_path, engine='netcdf4')
-            if ifp == 0:
-                lat_indices, lon_indices = RegridToPoints(base_ds, lat_list, lon_list)
+            try:
+                base_ds = xr.open_dataset(base_file_path, engine='netcdf4')
+            except OSError as err:
+                print(f"  SKIPPING unreadable file {file_path.name}: {err}")
+                failed.append(file_path.name)
+                continue
 
-            new_ds = RegridMet(base_ds, lat_indices, lon_indices)
-            new_ds.to_netcdf(new_file_path)
-            new_ds.close()
-            base_ds.close()
+            with base_ds:
+                if lat_indices is None:
+                    lat_indices, lon_indices = RegridToPoints(base_ds, lat_list, lon_list)
+                    print(f"Setting up grid translation")
+                print(f"Converting: {base_file_path} -> {new_file_path}")
+                new_ds = RegridMet(base_ds, lat_indices, lon_indices)
+                new_ds.to_netcdf(new_file_path)
+                new_ds.close()
+
+        if failed:
+            print(f"\n{len(failed)} file(s) could not be read: {failed}")
 
     print("\nDone.")
 
