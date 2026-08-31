@@ -23,6 +23,16 @@ _DEFAULT_STREAM_LIST_FILE = (
     _SCRIPT_DIR / "../../../data_comps/datm/cime_config/namelist_definition_datm.xml"
 ).resolve()
 
+
+def _is_good(path):
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        return False
+    try:
+        with xr.open_dataset(path, engine='netcdf4'):
+            return True
+    except OSError:
+        return False
+
 def GetXmlVals(root, group_str, tag_id_name, tag_name):
     entry = root.find(f"./entry[@id='{group_str}']")
     if entry is None:
@@ -331,6 +341,10 @@ def main():
         "--yes", "-y", action="store_true", default=False,
         help="Skip all interactive confirmation prompts"
     )
+    parser.add_argument(
+        "--skip-existing", action="store_true", default=False,
+        help="Skip regridding any output file that already exists and is non-empty"
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
@@ -339,6 +353,7 @@ def main():
     validate_config(config)
 
     dry_run = args.dry_run or config.get("dry_run", False)
+    skip_existing = args.skip_existing or config.get("skip_existing", False)
     yes = args.yes
 
     din_loc_root           = config["din_loc_root"]
@@ -464,12 +479,17 @@ def main():
         lat_indices = None
         lon_indices = None
 
-
+        n_skipped = 0
         failed = []
         for ifp, file_path in enumerate(sorted(Path(stream_path_dir).glob("clmforc*.nc"))):
             base_file_path = str(file_path)
             new_file_path = new_path_dir + '/' + file_path.name
 
+            if skip_existing and _is_good(new_file_path):
+                print(f"  exists, skipping: {file_path.name}")
+                n_skipped += 1
+                continue
+            
             try:
                 base_ds = xr.open_dataset(base_file_path, engine='netcdf4')
             except OSError as err:
