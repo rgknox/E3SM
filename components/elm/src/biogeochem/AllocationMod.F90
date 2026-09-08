@@ -125,6 +125,9 @@ module AllocationMod
   logical :: crop_supln  = .false.    !Prognostic crop receives supplemental Nitrogen
 
   real(r8), allocatable,target :: veg_rootc_bigleaf(:,:)        ! column-level fine-root biomas kgc/m3
+  real(r8), allocatable,target :: vmax_nh4_bigleaf(:)
+  real(r8), allocatable,target :: vmax_no3_bigleaf(:)
+  real(r8), allocatable,target :: vmax_po4_bigleaf(:)
   integer,  pointer :: ft_index_bigleaf(:)                      ! array holding the pft index of each competitor
 
   ! ECA parameters
@@ -257,6 +260,9 @@ contains
        if (.not.use_fates) then
           allocate(ft_index_bigleaf(bounds%begp:bounds%endp)); ft_index_bigleaf(bounds%begp:bounds%endp) = -1
           allocate(veg_rootc_bigleaf(bounds%begp:bounds%endp,1:nlevdecomp)); veg_rootc_bigleaf(bounds%begp:bounds%endp,1:nlevdecomp) = nan
+          allocate(vmax_nh4_bigleaf(bounds%begp:bounds%endp));vmax_nh4_bigleaf(:) = nan
+          allocate(vmax_no3_bigleaf(bounds%begp:bounds%endp));vmax_no3_bigleaf(:) = nan
+          allocate(vmax_po4_bigleaf(bounds%begp:bounds%endp));vmax_po4_bigleaf(:) = nan
        end if
     end if
 
@@ -1302,12 +1308,12 @@ contains
                     ! [gN/m3/s] = [gC/m3] * [gN/gC/s]
                     col_plant_ndemand_vr(c,j) = col_plant_ndemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         (elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft) + &
-                          elm_fates%fates(ci)%bc_pconst%vmax_no3(ft))
+                         (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_no3(f))
 
                     col_plant_pdemand_vr(c,j) = col_plant_pdemand_vr(c,j) + &
                          elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                         elm_fates%fates(ci)%bc_pconst%vmax_p(ft)
+                         elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)
                  end do
 
                  ! [gN/m2/s]
@@ -1353,6 +1359,9 @@ contains
                     f = f + 1
                     filter_pcomp(f) = p
                     ft_index_bigleaf(p) = ivt(p)
+                    vmax_nh4_bigleaf(p) = vmax_plant_nh4(ivt(p))
+                    vmax_no3_bigleaf(p) = vmax_plant_no3(ivt(p))
+                    vmax_po4_bigleaf(p) = vmax_plant_p(ivt(p))
                     do j = 1,nlevdecomp
 
                        ! microbial decomposer biomass [gc/m3]
@@ -1384,11 +1393,7 @@ contains
                  end do
               end if
 
-              km_nh4_ptr    => km_plant_nh4
-              vmax_nh4_ptr  => vmax_plant_nh4
               cn_scalar_runmean_ptr => cn_scalar_runmean
-              km_no3_ptr   => km_plant_no3
-              vmax_no3_ptr => vmax_plant_no3
               plant_no3demand_vr_ptr => plant_no3demand_vr_patch
               plant_nh4demand_vr_ptr => plant_nh4demand_vr_patch
 
@@ -1406,8 +1411,6 @@ contains
               end if
               plant_pdemand_vr_ptr => plant_pdemand_vr_patch
               cp_scalar_runmean_ptr => cp_scalar_runmean
-              km_p_ptr      => km_plant_p
-              vmax_p_ptr    => vmax_plant_p
 
            end do 
          end if ! nu_com
@@ -1460,14 +1463,14 @@ contains
               pcf     = n_pcomp
 
               veg_rootc_ptr  => elm_fates%fates(ci)%bc_out(s)%veg_rootc
-              ft_index_ptr   => elm_fates%fates(ci)%bc_out(s)%ft_index      ! Should be
-              cn_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cn_scalar  ! This is 1.0
+              ft_index_ptr   => elm_fates%fates(ci)%bc_out(s)%ft_index
+              cn_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cn_scalar
               plant_nh4demand_vr_ptr => plant_nh4demand_vr_fates
               km_nh4_ptr             => elm_fates%fates(ci)%bc_pconst%eca_km_nh4
-              vmax_nh4_ptr           => elm_fates%fates(ci)%bc_pconst%vmax_nh4
+              vmax_nh4_ptr           => elm_fates%fates(ci)%bc_out(s)%vmax_nh4
               plant_no3demand_vr_ptr => plant_no3demand_vr_fates
               km_no3_ptr             => elm_fates%fates(ci)%bc_pconst%eca_km_no3
-              vmax_no3_ptr           => elm_fates%fates(ci)%bc_pconst%vmax_no3
+              vmax_no3_ptr           => elm_fates%fates(ci)%bc_out(s)%vmax_no3
               do f = 1, n_pcomp
                  filter_pcomp(f) = f
               end do
@@ -1480,10 +1483,10 @@ contains
               veg_rootc_ptr  => veg_rootc_bigleaf
 
               km_nh4_ptr    => km_plant_nh4
-              vmax_nh4_ptr  => vmax_plant_nh4
+              vmax_nh4_ptr  => vmax_nh4_bigleaf
               cn_scalar_runmean_ptr => cn_scalar_runmean
               km_no3_ptr   => km_plant_no3
-              vmax_no3_ptr => vmax_plant_no3
+              vmax_no3_ptr => vmax_no3_bigleaf
               plant_no3demand_vr_ptr => plant_no3demand_vr_patch
               plant_nh4demand_vr_ptr => plant_nh4demand_vr_patch
               f = 0
@@ -1514,7 +1517,7 @@ contains
                                    smin_nh4_vr(c,:),                  & ! IN
                                    nu_com,                            & ! IN
                                    km_nh4_ptr,                        & ! IN
-                                   vmax_nh4_ptr,                      & ! IN
+                                   vmax_nh4_ptr(pci:pcf),             & ! IN
                                    km_decomp_nh4,                     & ! IN
                                    potential_immob_vr(c,:),           & ! IN
                                    plant_nh4demand_vr_ptr(pci:pcf,:), & ! INOUT
@@ -1524,7 +1527,7 @@ contains
                                    smin_nh4_to_plant_vr(c,:),         & ! OUT
                                    smin_no3_vr(c,:),                  & ! IN
                                    km_no3_ptr,                        & ! IN
-                                   vmax_no3_ptr,                      & ! IN
+                                   vmax_no3_ptr(pci:pcf),             & ! IN
                                    km_decomp_no3,                     & ! IN
                                    km_nit,                            & ! IN
                                    km_den,                            & ! IN
@@ -1628,7 +1631,7 @@ contains
               cp_scalar_runmean_ptr  => elm_fates%fates(ci)%bc_out(s)%cp_scalar  ! This is 1.0
               plant_pdemand_vr_ptr   => plant_pdemand_vr_fates
               km_p_ptr               => elm_fates%fates(ci)%bc_pconst%eca_km_p
-              vmax_p_ptr             => elm_fates%fates(ci)%bc_pconst%vmax_p
+              vmax_p_ptr             => elm_fates%fates(ci)%bc_out(s)%vmax_po4
               do f = 1, n_pcomp
                  filter_pcomp(f) = f
               end do
@@ -1641,7 +1644,7 @@ contains
               plant_pdemand_vr_ptr => plant_pdemand_vr_patch
               cp_scalar_runmean_ptr => cp_scalar_runmean
               km_p_ptr      => km_plant_p
-              vmax_p_ptr    => vmax_plant_p
+              vmax_p_ptr    => vmax_po4_bigleaf
               f = 0
               do p = pci, pcf
                  if (veg_pp%active(p).and. (veg_pp%itype(p) .ne. noveg)) then
@@ -1670,10 +1673,10 @@ contains
                 filter_pcomp(1:n_pcomp),            & ! IN
                 veg_rootc_ptr(pci:pcf,:),           & ! IN
                 ft_index_ptr(pci:pcf),              & ! IN
-                decompmicc(fc,:),                         & ! IN
+                decompmicc(fc,:),                   & ! IN
                 cp_scalar_runmean_ptr(pci:pcf),     & ! IN
                 km_p_ptr(:),                        & ! IN
-                vmax_p_ptr(:),                      & ! IN
+                vmax_p_ptr(pci:pcf),                & ! IN
                 km_decomp_p,                        & ! IN
                 labilep_vr(c,:),                    & ! IN
                 plant_pdemand_vr_ptr(pci:pcf,:),    & ! INOUT
@@ -2021,6 +2024,14 @@ contains
            s = elm_fates%f2hmap(ci)%hsites(c)
            n_pcomp = elm_fates%fates(ci)%bc_out(s)%num_plant_comps
 
+           ! Plant optimization wants to know how soil nutrient
+           ! concentrations are changing
+           do j = 1,nlevdecomp
+              elm_fates%fates(ci)%bc_in(s)%nh4_prof(j) = smin_nh4_vr(c,j)
+              elm_fates%fates(ci)%bc_in(s)%no3_prof(j) = smin_no3_vr(c,j)
+              elm_fates%fates(ci)%bc_in(s)%po4_prof(j) = solutionp_vr(c,j)
+           end do
+           
            if (nu_com .eq. 'RD') then
 
               if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
@@ -2032,7 +2043,7 @@ contains
                     ndemand=0._r8
                     do j = 1,nlevdecomp
                        ndemand = ndemand + elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                            (elm_fates%fates(ci)%bc_pconst%vmax_nh4(ft)+elm_fates%fates(ci)%bc_pconst%vmax_no3(ft)) * &
+                            (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)+elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)) * &
                             dzsoi_decomp(j)
                     end do
 
@@ -2061,7 +2072,7 @@ contains
                   do j = 1,nlevdecomp
                      ! [gP/m2/s]
                      pdemand = pdemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                          elm_fates%fates(ci)%bc_pconst%vmax_p(ft) * &
+                          elm_fates%fates(ci)%bc_out%vmax_po4(f) * &
                           dzsoi_decomp(j)
                   end do
 
@@ -2400,7 +2411,7 @@ contains
        smin_nh4_vr,            & ! IN (j)
        nu_com,                 & ! IN
        km_nh4_plant,           & ! IN (pft)
-       vmax_nh4_plant,         & ! IN (pft)
+       vmax_nh4_plant,         & ! IN (icomp)
        km_decomp_nh4,          & ! IN
        potential_immob_vr,     & ! IN (j)
        plant_nh4demand_vr,     & ! INOUT (i,j)
@@ -2410,7 +2421,7 @@ contains
        smin_nh4_to_plant_vr,   & ! OUT (j)
        smin_no3_vr,            & ! IN (j)
        km_no3_plant,           & ! IN (pft)
-       vmax_no3_plant,         & ! IN (pft)
+       vmax_no3_plant,         & ! IN (icomp)
        km_decomp_no3,          & ! IN (j)
        km_nit,                 & ! IN (j)
        km_den,                 & ! IN (j)
@@ -2446,7 +2457,7 @@ contains
     ! NH4 specific arguments
     real(r8), intent(in)  :: smin_nh4_vr(:)            ! minearlized nh4 in soil [g m-3]
     real(r8), intent(in)  :: km_nh4_plant(:)           ! km for plant type uptake
-    real(r8), intent(in)  :: vmax_nh4_plant(:)         ! vmax for plant uptake
+    real(r8), intent(in)  :: vmax_nh4_plant(pci:)         ! vmax for plant uptake
     real(r8), intent(in)  :: km_decomp_nh4             ! km for microbial decomposer nh4 uptake
     real(r8), intent(in)  :: potential_immob_vr(:)     ! potential N immobilization [g/m3/s]
     real(r8), intent(inout) :: plant_nh4demand_vr(pci:,:) ! [g m-3 s-1] (m2 of col, not patch)
@@ -2459,7 +2470,7 @@ contains
     ! NO3 specific arguments (all optional)
     real(r8), intent(in)  :: smin_no3_vr(:)            ! minearlized no3 in soil [g m-3]
     real(r8), intent(in)  :: km_no3_plant(:)           ! km for plant type uptake
-    real(r8), intent(in)  :: vmax_no3_plant(:)         ! vmax for plant uptake
+    real(r8), intent(in)  :: vmax_no3_plant(pci:)         ! vmax for plant uptake
     real(r8), intent(in)  :: km_decomp_no3             ! km for microbial decomposer nh4 uptake
     real(r8), intent(in)  :: km_nit                    ! km for nitrifier nh4 uptake
     real(r8), intent(in)  :: km_den                    ! km for denitrifier no3 uptake
@@ -2537,7 +2548,7 @@ contains
 
           ! This is the demand per m3 of the column (not patch)
           ! (for native ELM divide through by the patch weight to get per m3 of patch)
-          plant_nh4demand_vr(ip,j) = max(0._r8,vmax_nh4_plant(ft) * veg_rootc(ip,j) * &
+          plant_nh4demand_vr(ip,j) = max(0._r8,vmax_nh4_plant(ip) * veg_rootc(ip,j) * &
                cn_scalar_runmean(ip) * t_scalar(j) *  compet_plant(i))
 
           ! This is the total demand across all plant competitors
@@ -2642,7 +2653,7 @@ contains
 
           ! This is the demand per m3 of the column (not patch)
           ! (for native ELM divide through by the patch weight to get per m3 of patch)
-          plant_no3demand_vr(ip,j) = max(0._r8,vmax_no3_plant(ft) * veg_rootc(ip,j) * &
+          plant_no3demand_vr(ip,j) = max(0._r8,vmax_no3_plant(ip) * veg_rootc(ip,j) * &
                cn_scalar_runmean(ip) * t_scalar(j) *  compet_plant(i))
 
           ! This is the total demand across all plant competitors  (weighted in native, because
@@ -2763,7 +2774,7 @@ contains
     real(r8), intent(in) :: decompmicc(:)
     real(r8), intent(in) :: cp_scalar_runmean(pci:)
     real(r8), intent(in) :: km_plant_p(:)
-    real(r8), intent(in) :: vmax_plant_p(:)
+    real(r8), intent(in) :: vmax_plant_p(pci:)
     real(r8), intent(in) :: km_decomp_p
     real(r8), intent(in) :: labilep_vr(:)
 
@@ -2829,7 +2840,7 @@ contains
        do i = 1,n_pcomp
           ip = filter_pcomp(i)
           ft = ft_index(ip)
-          plant_pdemand_vr_patch(ip,j) = max(0._r8,vmax_plant_p(ft) * veg_rootc(ip,j) * &
+          plant_pdemand_vr_patch(ip,j) = max(0._r8,vmax_plant_p(ip) * veg_rootc(ip,j) * &
                cp_scalar_runmean(ip) * t_scalar(j) * compet_plant(i))
           col_plant_pdemand_vr(j) = col_plant_pdemand_vr(j) + plant_pdemand_vr_patch(ip,j)
        end do
