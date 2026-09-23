@@ -371,6 +371,10 @@ contains
        nu_com_nfix = .true.
     end select
 
+    ! Use the legacy phosphatase code with FATES
+    if(use_fates)then
+       nu_com_phosphatase = .false.
+    end if
 
     ! phosphorus conditions of plants are needed, in order to use new fixation and phosphatase
     ! activity subroutines, under carbon only or carbon nitrogen only mode, fixation and phosphatase
@@ -1120,6 +1124,7 @@ contains
    real(r8), parameter :: cn_stoich_var=0.2    ! variability of CN ratio
    real(r8), parameter :: cp_stoich_var=0.4    ! variability of CP ratio
    real(r8) :: sum1,sum2,sum_immob_no3,sum_immob_nh4,sum_immob_p,sum_pot_immob_p
+   real(r8) :: cohort_frac  ! Fraction of resources going to each cohort
    integer :: begc, endc 
 
    !-----------------------------------------------------------------------
@@ -2043,23 +2048,35 @@ contains
                     ndemand=0._r8
                     do j = 1,nlevdecomp
                        ndemand = ndemand + elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                            (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)+elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)) * &
-                            dzsoi_decomp(j)
+                            (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
+                             elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)) * dzsoi_decomp(j)
                     end do
 
+                    cohort_frac = ndemand/plant_ndemand_col(c)
+                    
                     do j = 1,nlevdecomp
 
                        elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = &
                             elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
-                            smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                            (ndemand/plant_ndemand_col(c))
-
+                            smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * cohort_frac
+                       
                        elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) = &
                             elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) + &
-                            smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                            (ndemand/plant_ndemand_col(c))
+                            smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * cohort_frac
 
+                       
+                       elm_fates%fates(ci)%bc_in(s)%nh4_prof(j) = &
+                            min(1.0_r8,smin_nh4_to_plant_vr(c,j)*cohort_frac / &
+                            (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                             elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)))
+
+                       elm_fates%fates(ci)%bc_in(s)%no3_prof(j)	= &
+                            min(1.0_r8,smin_no3_to_plant_vr(c,j)*cohort_frac / &
+                            (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                             elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)))
+                       
                     end do
+                    
                  end do
               end if
 
@@ -2072,17 +2089,21 @@ contains
                   do j = 1,nlevdecomp
                      ! [gP/m2/s]
                      pdemand = pdemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                          elm_fates%fates(ci)%bc_out%vmax_po4(f) * &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_po4(f) * &
                           dzsoi_decomp(j)
                   end do
-
+                  cohort_frac = pdemand/plant_pdemand_col(c)
                   do j = 1,nlevdecomp
                      ! [gP/m2/step]
                      elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) = &
                           elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) + &
                           sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                          (pdemand/plant_pdemand_col(c))
+                          (cohort_frac)
 
+                     elm_fates%fates(ci)%bc_in(s)%po4_prof(j) = &
+                            min(1.0_r8,sminp_to_plant_vr(c,j)*cohort_frac / &
+			    (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                             elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)))
                   end do
                end do
             end if
