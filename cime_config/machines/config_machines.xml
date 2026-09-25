@@ -251,9 +251,9 @@
         <command name="load">cmake/3.30.2</command>
       </modules>
       <modules DEBUG="TRUE"> <!-- https://github.com/E3SM-Project/E3SM/issues/8062 -->
-        <command name="load">cray-hdf5-parallel/1.12.2.9</command>
-        <command name="load">cray-netcdf-hdf5parallel/4.9.0.9</command>
-        <command name="load">cray-parallel-netcdf/1.12.3.13</command>
+        <command name="load">cray-hdf5-parallel/1.14.3.9</command>
+        <command name="load">cray-netcdf-hdf5parallel/4.9.2.3</command>
+        <command name="load">cray-parallel-netcdf/1.12.3.21</command>
       </modules>
       <modules DEBUG="FALSE">
         <command name="load">cray-hdf5-parallel/1.14.3.7</command>
