@@ -137,6 +137,8 @@ module AllocationMod
   ! scaling factor for plant fine root biomass to calculate nutrient carrier enzyme abundance
   real(r8), parameter :: e_decomp_scalar = 0.05_r8
 
+  logical,parameter :: debug=.true.
+  
   !$acc declare create(e_decomp_scalar)
   !$acc declare create(e_plant_scalar)
 
@@ -1106,6 +1108,11 @@ contains
    ! Fractional uptake profiles, that are proportional to root density
    real(r8):: nuptake_prof(1:num_soilc,1:nlevdecomp)
    real(r8):: puptake_prof(1:num_soilc,1:nlevdecomp)
+   real(r8) :: sum_ndemand(1:nlevdecomp)  ! sum N demand across cohorts
+   real(r8) :: sum_pdemand(1:nlevdecomp)  ! sum P demand across cohorts
+   real(r8) :: demand_frac  ! fraction of resources going to a cohort
+   real(r8) :: plant_uptake_err ! error on plant nutrient uptake g/m2/day
+   real(r8) :: sum_nh4uptake,sum_no3uptake,sum_po4uptake
    integer,  allocatable :: filter_pcomp(:)               ! this is a plant competitor map for FATES/ELM-BL w/ ECA
    real(r8), allocatable,target :: plant_nh4demand_vr_fates(:,:) ! nh4 demand per competitor per soil layer
    real(r8), allocatable,target :: plant_no3demand_vr_fates(:,:) ! no3 demand per competitor per soil layer
@@ -1124,9 +1131,8 @@ contains
    real(r8), parameter :: cn_stoich_var=0.2    ! variability of CN ratio
    real(r8), parameter :: cp_stoich_var=0.4    ! variability of CP ratio
    real(r8) :: sum1,sum2,sum_immob_no3,sum_immob_nh4,sum_immob_p,sum_pot_immob_p
-   real(r8) :: cohort_frac  ! Fraction of resources going to each cohort
    integer :: begc, endc 
-
+   
    !-----------------------------------------------------------------------
 
    associate(                                                                                 &
@@ -2028,83 +2034,86 @@ contains
            ci      = bounds%clump_index
            s = elm_fates%f2hmap(ci)%hsites(c)
            n_pcomp = elm_fates%fates(ci)%bc_out(s)%num_plant_comps
+           sum_ndemand(1:nlevdecomp) = 0._r8
+           sum_pdemand(1:nlevdecomp) = 0._r8
 
+           sum_nh4uptake = 0._r8
+           sum_no3uptake = 0._r8
+           sum_po4uptake = 0._r8
+           
            ! Plant optimization wants to know how soil nutrient
            ! concentrations are changing
            do j = 1,nlevdecomp
-              elm_fates%fates(ci)%bc_in(s)%nh4_prof(j) = smin_nh4_vr(c,j)
-              elm_fates%fates(ci)%bc_in(s)%no3_prof(j) = smin_no3_vr(c,j)
-              elm_fates%fates(ci)%bc_in(s)%po4_prof(j) = solutionp_vr(c,j)
+              do f = 1,n_pcomp
+                 sum_ndemand(j) = sum_ndemand(j) + &
+                      elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                      (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
+                      elm_fates%fates(ci)%bc_out(s)%vmax_no3(f))
+                 sum_pdemand(j) = sum_pdemand(j) + &
+                      elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                      elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)
+              end do
            end do
            
            if (nu_com .eq. 'RD') then
 
               if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
                  do f = 1,n_pcomp
-
-                    ft = elm_fates%fates(ci)%bc_out(s)%ft_index(f)
-
-                    ! [gN/m2/s]
-                    ndemand=0._r8
                     do j = 1,nlevdecomp
-                       ndemand = ndemand + elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                       demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
                             (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
-                             elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)) * dzsoi_decomp(j)
-                    end do
-
-                    cohort_frac = ndemand/plant_ndemand_col(c)
-                    
-                    do j = 1,nlevdecomp
+                             elm_fates%fates(ci)%bc_out(s)%vmax_no3(f))/sum_ndemand(j)
 
                        elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = &
                             elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
-                            smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * cohort_frac
+                            demand_frac * smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
+
+                       sum_nh4uptake = sum_nh4uptake + &
+                            demand_frac * smin_nh4_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
                        
                        elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) = &
                             elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) + &
-                            smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * cohort_frac
+                            demand_frac * smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
 
-                       
-                       elm_fates%fates(ci)%bc_in(s)%nh4_prof(j) = &
-                            min(1.0_r8,smin_nh4_to_plant_vr(c,j)*cohort_frac / &
-                            (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                             elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)))
-
-                       elm_fates%fates(ci)%bc_in(s)%no3_prof(j)	= &
-                            min(1.0_r8,smin_no3_to_plant_vr(c,j)*cohort_frac / &
-                            (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                             elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)))
+                       sum_no3uptake =	sum_no3uptake +	&
+                            demand_frac * smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
                        
                     end do
+
+                    ! The gamma function is essentially the fraction of demand fullfilled
+                    ! by the competition scheme. We use this for FATES plant resource optimization
+                    !elm_fates%fates(ci)%bc_in(s)%nh4_gamma(f) = &
+                    !     min(1._r8,elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f) / &
+                    !     (dt*sum(elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp))*&
+                    !      elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)))
+
+                    !elm_fates%fates(ci)%bc_in(s)%no3_gamma(f) = &
+                    !     min(1._r8,elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f) / &
+		    !     (dt*sum(elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp))*&
+                    !      elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)))
                     
                  end do
               end if
 
             if( plant_pdemand_col(c)>tiny(plant_pdemand_col(c)) ) then
                do f = 1,n_pcomp
-
-                  ft = elm_fates%fates(ci)%bc_out(s)%ft_index(f)
-
-                  pdemand=0._r8
                   do j = 1,nlevdecomp
-                     ! [gP/m2/s]
-                     pdemand = pdemand+elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                          elm_fates%fates(ci)%bc_out(s)%vmax_po4(f) * &
-                          dzsoi_decomp(j)
-                  end do
-                  cohort_frac = pdemand/plant_pdemand_col(c)
-                  do j = 1,nlevdecomp
-                     ! [gP/m2/step]
+                     demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)/sum_pdemand(j)
+                     
                      elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) = &
                           elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) + &
-                          sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j) * &
-                          (cohort_frac)
+                          demand_frac * sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
 
-                     elm_fates%fates(ci)%bc_in(s)%po4_prof(j) = &
-                            min(1.0_r8,sminp_to_plant_vr(c,j)*cohort_frac / &
-			    (elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
-                             elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)))
+                     sum_po4uptake =	sum_po4uptake +	&
+                          demand_frac * sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
+                     
                   end do
+                  !elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = &
+                  !     min(1._r8,elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f) / &
+                  !     (dt*sum(elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp))*&
+                  !     elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)))
+                  
                end do
             end if
 
@@ -2113,21 +2122,85 @@ contains
             do f = 1,n_pcomp
                do j = 1,nlevdecomp
 
+                  !smin_nh4_to_plant_vr
+                  
                   elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = &
                        elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
+                       plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
+
+                  sum_nh4uptake =    sum_nh4uptake + &
                        plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
 
                   elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) = &
                        elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) + &
                        plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j) * dzsoi_decomp(j) * dt
 
+                  sum_no3uptake = sum_no3uptake + &
+                       (plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j)) * dzsoi_decomp(j) * dt
+                  
                   elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) = &
                        elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) + &
                        (plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
 
-               end do
-            end do
+                  sum_po4uptake = sum_po4uptake + &
+                       (plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
 
+                  
+               end do
+
+               !demand_frac = sum(plant_nh4demand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
+               !if(demand_frac>1.e-13)then
+               !   elm_fates%fates(ci)%bc_in(s)%nh4_gamma(f) = &
+               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f)/demand_frac)
+               !else
+               !   elm_fates%fates(ci)%bc_in(s)%nh4_gamma(f) = 0._r8
+               !end if
+               
+               !demand_frac = sum(plant_no3demand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
+               !if(demand_frac>1.e-13)then
+               !   elm_fates%fates(ci)%bc_in(s)%no3_gamma(f) = &
+               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f) / demand_frac)
+               !else
+               !   elm_fates%fates(ci)%bc_in(s)%no3_gamma(f) = 0._r8
+               !end if
+
+               !demand_frac = sum(plant_pdemand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
+               !if(demand_frac>1.e-13)then
+               !   elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = &
+               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f) / demand_frac)
+               !else
+               !   elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = 0._r8
+               !end if
+               
+            end do
+            
+            if(.false.)then
+               plant_uptake_err = sum_nh4uptake - &
+                                  sum(smin_nh4_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+               if(abs(plant_uptake_err)>1.e-12_r8)then
+                  write(iulog,*)"fates plant uptake mass conservation error NH4: ",plant_uptake_err, &
+                       sum_nh4uptake, &
+                       sum(smin_nh4_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+                  call endrun(errMsg(__FILE__, __LINE__))
+               end if
+               plant_uptake_err = sum_no3uptake - &
+                                  sum(smin_no3_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+               if(abs(plant_uptake_err)>1.e-12_r8)then
+                  write(iulog,*)"fates plant uptake mass conservation error NO3: ",plant_uptake_err, &
+                       sum_no3uptake, &
+                       sum(smin_no3_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+                  call endrun(errMsg(__FILE__, __LINE__))
+               end if
+               plant_uptake_err = sum_po4uptake - &
+                                  sum(sminp_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+               if(abs(plant_uptake_err)>1.e-12_r8)then
+                  write(iulog,*)'fates plant uptake mass conservation error, phos: ',plant_uptake_err, &
+                       sum_po4uptake, &
+                       sum(sminp_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
+                  call endrun(errMsg(__FILE__, __LINE__))
+               end if
+            end if
+            
          end if
       end do
 
