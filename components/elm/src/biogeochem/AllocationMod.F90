@@ -1459,9 +1459,9 @@ contains
            smin_no3_to_plant_vr(begc:endc,1:nlevdecomp),&! OUT
            f_nit_vr(begc:endc,1:nlevdecomp),           & ! OUT
            f_denit_vr(begc:endc,1:nlevdecomp))           ! OUT
-
-     else
-        do fc=1,num_soilc
+       
+    else
+       do fc=1,num_soilc
 
            c = filter_soilc(fc)
            l = col_pp%landunit(c)
@@ -2615,6 +2615,15 @@ contains
        do i = 1, n_pcomp
           ip = filter_pcomp(i)
           ft = ft_index(ip)
+
+          if(ft<1)then
+             write(iulog,*) 'problem with pft indexing...'
+             write(iulog,*) 'n_pcomp:',n_pcomp,i
+             write(iulog,*) 'filter:',filter_pcomp(1:n_pcomp)
+             write(iulog,*) 'ft_index:',ft_index(:)
+             call endrun(msg=errMsg(__FILE__, __LINE__))
+          end if
+          
           e_km = e_km + e_plant_scalar*veg_rootc(ip,j)/km_nh4_plant(ft)
        end do
 
