@@ -64,6 +64,8 @@ contains
     real(r8):: cc_eca
     real(r8):: cn_eca
     real(r8):: cp_eca
+    logical :: adjust_cn
+    real(r8),parameter :: nearzero=1.e-15_r8
     !-----------------------------------------------------------------------
 
     associate(&
@@ -664,13 +666,20 @@ contains
                   cn_eca = 0.0_r8
                   do l = 1,ndecomp_pools
                      if ( col_cs%decomp_cpools_vr(c,j,l) > 0.0_r8 ) then
-                          if(abs(col_cs%decomp_cpools_vr(c,j,l) / col_ns%decomp_npools_vr(c,j,l) - initial_cn_ratio(l) ) > 1.0e-3_r8 &
-                          .and. (.not. floating_cn_ratio_decomp_pools(l)) ) then
-                        cn_eca = cn_eca - ( col_cs%decomp_cpools_vr(c,j,l) / initial_cn_ratio(l) - col_ns%decomp_npools_vr(c,j,l) )
-
-                          col_ns%decomp_npools_vr(c,j,l) = col_cs%decomp_cpools_vr(c,j,l) / initial_cn_ratio(l)
+                        adjust_cn=.false.
+                        if(col_ns%decomp_npools_vr(c,j,l)<nearzero) then
+                           adjust_cn=.true.
+                        else
+                           if(abs(col_cs%decomp_cpools_vr(c,j,l) / col_ns%decomp_npools_vr(c,j,l) - initial_cn_ratio(l) ) > 1.0e-3_r8 &
+                                .and. (.not. floating_cn_ratio_decomp_pools(l)) ) then
+                              adjust_cn=.true.
+                           end if
+                        end if
+                        if(adjust_cn)then
+                           cn_eca = cn_eca - ( col_cs%decomp_cpools_vr(c,j,l) / initial_cn_ratio(l) - col_ns%decomp_npools_vr(c,j,l) )
+                           col_ns%decomp_npools_vr(c,j,l) = col_cs%decomp_cpools_vr(c,j,l) / initial_cn_ratio(l)
+                        end if
                      end if
-                   end if
                   end do
                   col_ns%ntrunc_vr(c,j) = col_ns%ntrunc_vr(c,j) + cn_eca
                end do
