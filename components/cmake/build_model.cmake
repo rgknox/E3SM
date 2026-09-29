@@ -269,6 +269,10 @@ macro(build_model COMP_CLASS COMP_NAME)
       endif()
     endforeach()
 
+    if (TARGET hdf5 AND MPILIB STREQUAL "openmpi" AND MACH MATCHES "^(pm|muller|alvarez)-")
+      target_link_libraries(${TARGET_NAME} hdf5)
+    endif()
+
     # driver-mct/main sources (e.g. cime_comp_mod.F90) use netcdf directly, but
     # the component libraries only link netcdf PRIVATEly (via csm_share), so
     # its usage requirements (e.g. include dirs for netcdf.mod) do not
@@ -302,14 +306,14 @@ macro(build_model COMP_CLASS COMP_NAME)
       set_target_properties(${TARGET_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
       # A bit hacky, some platforms need help with the fortran linker
-      if (COMPILER STREQUAL "intel" OR COMPILER STREQUAL "oneapi-ifx")
+      if (COMPILER STREQUAL "intel")
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -cxxlib")
       endif()
 
     else()
       set_target_properties(${TARGET_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
-      if (COMPILER STREQUAL "oneapi-ifxgpu")
+      if (COMPILER STREQUAL "intelgpu")
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -Wl,-\-defsym,main=MAIN_\_ -lifcore -fsycl -Xsycl-target-backend \"-device pvc\" ")
       endif()
 

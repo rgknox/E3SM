@@ -1,5 +1,5 @@
 
-string(APPEND CMAKE_EXE_LINKER_FLAGS " -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=16 -Wl,--no-relax")
+string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsycl-device-code-split=per_kernel -fsycl-max-parallel-link-jobs=16 -Wl,--no-relax")
 if (compile_threaded)
   string(APPEND CMAKE_EXE_LINKER_FLAGS " -fiopenmp -fopenmp-targets=spir64")
 endif()
@@ -12,3 +12,11 @@ string(APPEND OMEGA_SYCL_EXE_LINKER_FLAGS " -Xsycl-target-backend \"-device pvc\
 # This is paired with MPIR_CVAR_ENABLE_GPU=1 in config_machines.xml. If this
 # ends up causing instability, we can switch to OFF.
 set(SCREAM_MPI_ON_DEVICE ON CACHE STRING "")
+
+set(USE_SYCL "TRUE")
+
+# Override the value TRUE set by intelgpu.cmake (via intel.cmake)
+set(E3SM_LINK_WITH_FORTRAN "FALSE")
+
+# EAMxx ignores generic CMAKE_CXX_FLAGS, includes CMAKE_CXX_FLAGS_[RELEASE,DEBUG]
+string(APPEND CMAKE_CXX_FLAGS_RELEASE " -fp-model precise")
