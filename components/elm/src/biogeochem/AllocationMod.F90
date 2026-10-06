@@ -1108,6 +1108,8 @@ contains
    ! Fractional uptake profiles, that are proportional to root density
    real(r8):: nuptake_prof(1:num_soilc,1:nlevdecomp)
    real(r8):: puptake_prof(1:num_soilc,1:nlevdecomp)
+   real(r8) :: sum_nh4demand(1:nlevdecomp)  ! sum NH4 demand across cohorts
+   real(r8) :: sum_no3demand(1:nlevdecomp)  ! sum NO3 demand across cohorts
    real(r8) :: sum_ndemand(1:nlevdecomp)  ! sum N demand across cohorts
    real(r8) :: sum_pdemand(1:nlevdecomp)  ! sum P demand across cohorts
    real(r8) :: demand_frac  ! fraction of resources going to a cohort
@@ -2043,6 +2045,8 @@ contains
            
            ! Plant optimization wants to know how soil nutrient
            ! concentrations are changing
+           sum_ndemand(1:nlevdecomp) = 0._r8
+           sum_pdemand(1:nlevdecomp) = 0._r8
            do j = 1,nlevdecomp
               do f = 1,n_pcomp
                  sum_ndemand(j) = sum_ndemand(j) + &
@@ -2056,10 +2060,33 @@ contains
            end do
            
            if (nu_com .eq. 'RD') then
-
+              
+              sum_ndemand(1:nlevdecomp) = 0._r8
+              sum_pdemand(1:nlevdecomp) = 0._r8
+              do j = 1,nlevdecomp
+                 do f = 1,n_pcomp
+                    sum_ndemand(j) = sum_ndemand(j) + &
+                         elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                         (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
+                         elm_fates%fates(ci)%bc_out(s)%vmax_no3(f))
+                    sum_pdemand(j) = sum_pdemand(j) + &
+                         elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                         elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)
+                 end do
+              end do
+           
               if( plant_ndemand_col(c)>tiny(plant_ndemand_col(c)) ) then
                  do f = 1,n_pcomp
                     do j = 1,nlevdecomp
+
+                       !if(sum_ndemand(j)<1.e-20_r8)then
+                       !   write(iulog,*)"n_pcomp:",n_pcomp
+                       !   write(iulog,*)"froot:",sum(elm_fates%fates(ci)%bc_out(s)%veg_rootc(:,j))
+                       !   write(iulog,*)"vmax no4:",elm_fates%fates(ci)%bc_out(s)%vmax_nh4(1:n_pcomp)
+                       !   write(iulog,*)"vmax no3:",elm_fates%fates(ci)%bc_out(s)%vmax_no3(1:n_pcomp)
+                       !end if
+                       
+                       if(sum_ndemand(j)>1.e-20_r8)then
                        demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
                             (elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f) + &
                              elm_fates%fates(ci)%bc_out(s)%vmax_no3(f))/sum_ndemand(j)
@@ -2077,7 +2104,7 @@ contains
 
                        sum_no3uptake =	sum_no3uptake +	&
                             demand_frac * smin_no3_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
-                       
+                       end if
                     end do
 
                     ! The gamma function is essentially the fraction of demand fullfilled
@@ -2098,6 +2125,7 @@ contains
             if( plant_pdemand_col(c)>tiny(plant_pdemand_col(c)) ) then
                do f = 1,n_pcomp
                   do j = 1,nlevdecomp
+                     if(sum_pdemand(j)>1.e-20_r8)then
                      demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
                           elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)/sum_pdemand(j)
                      
@@ -2107,7 +2135,7 @@ contains
 
                      sum_po4uptake =	sum_po4uptake +	&
                           demand_frac * sminp_to_plant_vr(c,j)*dt*dzsoi_decomp(j)
-                     
+                     end if
                   end do
                   !elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = &
                   !     min(1._r8,elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f) / &
@@ -2118,63 +2146,71 @@ contains
             end if
 
          else ! ECA or MIC mode
-
-            do f = 1,n_pcomp
-               do j = 1,nlevdecomp
-
-                  !smin_nh4_to_plant_vr
-                  
-                  elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = &
-                       elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
-                       plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
-
-                  sum_nh4uptake =    sum_nh4uptake + &
-                       plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
-
-                  elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) = &
-                       elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) + &
-                       plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j) * dzsoi_decomp(j) * dt
-
-                  sum_no3uptake = sum_no3uptake + &
-                       (plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j)) * dzsoi_decomp(j) * dt
-                  
-                  elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) = &
-                       elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) + &
-                       (plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
-
-                  sum_po4uptake = sum_po4uptake + &
-                       (plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
-
-                  
+            
+            sum_nh4demand(1:nlevdecomp) = 0._r8
+            sum_no3demand(1:nlevdecomp) = 0._r8
+            sum_pdemand(1:nlevdecomp) = 0._r8
+            do j = 1,nlevdecomp
+               do f = 1,n_pcomp
+                  sum_nh4demand(j) = sum_nh4demand(j) + &
+                       elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                       elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)
+                  sum_no3demand(j) = sum_no3demand(j) + &
+                       elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                       elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)
+                  sum_pdemand(j) = sum_pdemand(j) + &
+                       elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                       elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)
                end do
-
-               !demand_frac = sum(plant_nh4demand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
-               !if(demand_frac>1.e-13)then
-               !   elm_fates%fates(ci)%bc_in(s)%nh4_gamma(f) = &
-               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f)/demand_frac)
-               !else
-               !   elm_fates%fates(ci)%bc_in(s)%nh4_gamma(f) = 0._r8
-               !end if
-               
-               !demand_frac = sum(plant_no3demand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
-               !if(demand_frac>1.e-13)then
-               !   elm_fates%fates(ci)%bc_in(s)%no3_gamma(f) = &
-               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f) / demand_frac)
-               !else
-               !   elm_fates%fates(ci)%bc_in(s)%no3_gamma(f) = 0._r8
-               !end if
-
-               !demand_frac = sum(plant_pdemand_vr_fates(f,1:nlevdecomp)*dzsoi_decomp(1:nlevdecomp)) * dt
-               !if(demand_frac>1.e-13)then
-               !   elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = &
-               !        min(1._r8, elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f) / demand_frac)
-               !else
-               !   elm_fates%fates(ci)%bc_in(s)%po4_gamma(f) = 0._r8
-               !end if
-               
             end do
             
-            if(.false.)then
+            do f = 1,n_pcomp
+               do j = 1,nlevdecomp
+                  if(sum_nh4demand(j)>1.e-20_r8)then
+                     !smin_nh4_to_plant_vr
+                     demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_nh4(f)/sum_nh4demand(j)
+                     
+                     elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) = &
+                          elm_fates%fates(ci)%bc_in(s)%plant_nh4_uptake_flux(f,1) + &
+                          smin_nh4_to_plant_vr(c,j) * demand_frac * dzsoi_decomp(j) * dt
+                     
+                     !plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
+                     
+                     sum_nh4uptake =    sum_nh4uptake + &
+                          !plant_nh4demand_vr_fates(f,j) * fpg_nh4_vr(c,j)  * dzsoi_decomp(j) * dt
+                          smin_nh4_to_plant_vr(c,j) * demand_frac * dzsoi_decomp(j) * dt
+                  end if
+                  if(sum_no3demand(j)>1.e-20_r8)then
+                     demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_no3(f)/sum_no3demand(j)
+                     
+                     elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) = &
+                          elm_fates%fates(ci)%bc_in(s)%plant_no3_uptake_flux(f,1) + &
+                          !plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j) * dzsoi_decomp(j) * dt
+                          smin_no3_to_plant_vr(c,j)  * demand_frac * dzsoi_decomp(j) * dt
+                     
+                     sum_no3uptake = sum_no3uptake + &
+                          !(plant_no3demand_vr_fates(f,j) * fpg_no3_vr(c,j)) * dzsoi_decomp(j) * dt
+                          smin_no3_to_plant_vr(c,j)  * demand_frac * dzsoi_decomp(j) * dt
+                  end if
+                  if(sum_pdemand(j)>1.e-20_r8)then
+                     demand_frac = elm_fates%fates(ci)%bc_out(s)%veg_rootc(f,j) * &
+                          elm_fates%fates(ci)%bc_out(s)%vmax_po4(f)/sum_pdemand(j)
+                     
+                     elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) = &
+                          elm_fates%fates(ci)%bc_in(s)%plant_p_uptake_flux(f,1) + &
+                          sminp_to_plant_vr(c,j) * demand_frac * dzsoi_decomp(j) * dt
+                     !(plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
+                     
+                     sum_po4uptake = sum_po4uptake + &
+                          sminp_to_plant_vr(c,j) * demand_frac * dzsoi_decomp(j) * dt
+                     !(plant_pdemand_vr_fates(f,j) * fpg_p_vr(c,j)) * dzsoi_decomp(j) * dt
+                  end if
+               end do
+            end do
+               
+            if(.true.)then
                plant_uptake_err = sum_nh4uptake - &
                                   sum(smin_nh4_to_plant_vr(c,1:nlevdecomp)*dt*dzsoi_decomp(1:nlevdecomp))
                if(abs(plant_uptake_err)>1.e-12_r8)then
