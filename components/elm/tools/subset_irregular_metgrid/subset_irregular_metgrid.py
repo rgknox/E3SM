@@ -18,6 +18,7 @@ import shutil
 import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
+from scipy.spatial import cKDTree
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _DEFAULT_STREAM_LIST_FILE = (
@@ -161,7 +162,14 @@ def NearestGridIndex(mesh_lat, mesh_lon, t_lat, t_lon):
     return idx, dist_km
 
 
-def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
+def RegridToPoints(ds, target_lats, target_lons):
+    lat_idx, lon_idx, dist = BuildPointMap(ds["LATIXY"].values, ds["LONGXY"].values,
+                                           target_lats, target_lons)
+    print(f"--> matched {len(dist)} point(s); NN distance "
+          f"min/mean/max = {dist.min():.1f}/{dist.mean():.1f}/{dist.max():.1f} km")
+    return lat_idx, lon_idx
+
+def RegridToPoints_old(ds: xr.Dataset, target_lats: list, target_lons: list):
     """
     Identify spatial indices in a dataset nearest to the provided lat-lon list.
     Works on any dataset with LATIXY and LONGXY coordinate variables.
@@ -170,7 +178,9 @@ def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
     """
     latixy = ds["LATIXY"].values
     longxy = ds["LONGXY"].values
-
+    #lat_mesh = np.atleast_2d(base_ds["yc"].values)
+    #lon_mesh = np.atleast_2d(base_ds["xc"].values)
+    
     lat_indices, lon_indices, distances = [], [], []
     for tlat, tlon in zip(target_lats, target_lons):
         idx, dkm = NearestGridIndex(latixy, longxy, tlat, tlon)
@@ -189,6 +199,22 @@ def RegridToPoints(ds: xr.Dataset, target_lats: list, target_lons: list):
               f"{longxy[lat_indices[w], lon_indices[w]]:.2f})  {distances[w]:.1f} km")
 
     return lat_indices, lon_indices
+
+def BuildPointMap(latixy, longxy, target_lats, target_lons):
+    """Nearest source (lat_idx, lon_idx) for every target, by great-circle distance."""
+    shape = latixy.shape
+    src = np.column_stack(_unit_vectors(latixy.ravel(), longxy.ravel()))
+    valid = np.isfinite(src).all(axis=1)
+    tree = cKDTree(src[valid])
+
+    tgt = np.column_stack(_unit_vectors(target_lats, target_lons))
+    chord, k = tree.query(tgt)
+
+    flat = np.flatnonzero(valid)[k]
+    lat_idx, lon_idx = np.unravel_index(flat, shape)
+    dist_km = 2.0 * 6371.0 * np.arcsin(np.clip(chord / 2.0, 0.0, 1.0))
+    return lat_idx, lon_idx, dist_km
+
 
 def RegridSurface(base_ds: xr.Dataset,
                   target_lats: list,
@@ -219,10 +245,31 @@ def RegridSurface(base_ds: xr.Dataset,
     lon_da = xr.DataArray(np.array(matched_lon_indices), dims="gridcell")
 
     new_ds = base_ds.isel({lat_name: lat_da, lon_name: lon_da})
+    new_ds["LONGXY"].values[:] = np.asarray(target_lons, dtype=np.float64)
+    new_ds["LATIXY"].values[:] = np.asarray(target_lats, dtype=np.float64)
+    
     return new_ds
 
+def RegridMet(ds: xr.Dataset, lat_idx, lon_idx) -> xr.Dataset:
+    data_vars = {}
+    for var in ds.data_vars:
+        da = ds[var]
+        if "lat" in da.dims and "lon" in da.dims:
+            other = [d for d in da.dims if d not in ("lat", "lon")]
+            arr = da.transpose(*other, "lat", "lon").values
+            sub = arr[..., lat_idx, lon_idx]          # (..., N)
+            sub = sub[..., np.newaxis, :]             # (..., 1, N)
+            data_vars[var] = xr.DataArray(sub, dims=other + ["lat", "lon"],
+                                          attrs=da.attrs)
+        elif "lat" in da.dims or "lon" in da.dims:
+            continue                                  # 1-D on a spatial dim: drop
+        else:
+            data_vars[var] = da
+    coords = {"time": ds["time"]} if "time" in ds.coords else {}
+    return xr.Dataset(data_vars, coords=coords, attrs=ds.attrs)
 
-def RegridMet(ds: xr.Dataset, lat_indices: list, lon_indices: list) -> xr.Dataset:
+
+def RegridMet_old(ds: xr.Dataset, lat_indices: list, lon_indices: list) -> xr.Dataset:
     """
     Subset a meteorological dataset at pre-identified grid point indices.
 
@@ -470,13 +517,13 @@ def main():
 
     if coords_mode == "points":
         print(f"\nWill subset domain: {target_lnd_domain}")
-        print(f"  -> {new_domain_file}")
+        print(f"  -> {new_lnd_domain}")
         if not _confirm("Continue?", yes):
             print("Exiting.")
             sys.exit()
         if not dry_run:
             with xr.open_dataset(target_lnd_domain, engine='netcdf4') as base_ds:
-                RegridDomain(base_ds, lat_list, lon_list, target_lnd_domain).to_netcdf(new_lnd_domain)
+                RegridDomain(base_ds, lat_list, lon_list, target_lnd_domain).to_netcdf(new_lnd_domain, format="NETCDF3_64BIT")
     else:
         # If in domain mode, the new land domain is an exact copy of the target
         # And the stream domain is an unmasked copy
@@ -487,7 +534,7 @@ def main():
     ds = xr.open_dataset(new_lnd_domain)
     CheckDomainVars(ds,new_lnd_domain)
     ds["mask"] = xr.ones_like(ds["mask"])
-    ds.to_netcdf(new_stream_domain)
+    ds.to_netcdf(new_stream_domain, format="NETCDF3_64BIT")
 
         
 
@@ -495,7 +542,7 @@ def main():
     new_surf_files = []
     for base_surf_file in base_surf_files:
         base_surf_path = Path(base_surf_file)
-        new_surf_file = new_domain_dir + '/' + base_surf_path.name
+        new_surf_file = f"{new_lnd_domain.parent}" + '/' + base_surf_path.name
         new_surf_files.append(new_surf_file)
         print(f"\nWill subset surface: {base_surf_file}")
         print(f"  -> {new_surf_file}")
@@ -505,7 +552,7 @@ def main():
         if not dry_run:
             base_ds = xr.open_dataset(base_surf_file, engine='netcdf4')
             new_ds = RegridSurface(base_ds, lat_list, lon_list)
-            new_ds.to_netcdf(new_surf_file)
+            new_ds.to_netcdf(new_surf_file, format="NETCDF3_64BIT")
 
 
             
@@ -543,8 +590,9 @@ def main():
                 print(f"    {fp.name} -> {new_path_dir}/{fp.name}")
             continue
 
-        lat_indices = None
-        lon_indices = None
+        
+        lat_idx = None
+        lon_idx = None
 
         n_skipped = 0
         failed = []
@@ -565,12 +613,34 @@ def main():
                 continue
 
             with base_ds:
-                if lat_indices is None:
-                    lat_indices, lon_indices = RegridToPoints(base_ds, lat_list, lon_list)
-                    print(f"Setting up grid translation")
+                if lat_idx is None:
+                    print(f"Determining ATM map")
+                    lat_idx, lon_idx = RegridToPoints(base_ds, lat_list, lon_list)
+                    print(f"lat shape: {np.asarray(lat_idx).shape}, lon shape: {np.asarray(lon_idx).shape}")
+                    #print(f"Determining ATM map old")
+                    #old_lat, old_lon = RegridToPoints_old(base_ds, lat_list, lon_list)
+                    #print(f"Asserting same maps")
+                    #old_lat, old_lon = np.asarray(old_lat), np.asarray(old_lon)
+                    #new_lat, new_lon = np.asarray(lat_idx), np.asarray(lon_idx)
+                    #assert old_lat.shape == new_lat.shape, "different number of matched points"
+
+                    #differ = (old_lat != new_lat) | (old_lon != new_lon)
+                    #if not differ.any():
+                    #    print(differ)
+                    #else:
+                    #    print(f"identical: all {len(old_lat)} point(s) matched the same cells")
+                    #print(f"Setting up grid translation")
+                    
                 print(f"Converting: {base_file_path} -> {new_file_path}")
-                new_ds = RegridMet(base_ds, lat_indices, lon_indices)
-                new_ds.to_netcdf(new_file_path)
+
+                #old_ds = RegridMet_old(ds, list(lat_idx), list(lon_idx))
+                new_ds = RegridMet(base_ds, lat_idx, lon_idx)
+                #for v in new_ds.data_vars:
+                #    if "lon" in new_ds[v].dims:
+                #        assert np.array_equal(old_ds[v].values, new_ds[v].values, equal_nan=True), v
+                #        print("identical")
+                
+                new_ds.to_netcdf(new_file_path, format="NETCDF3_64BIT")
                 new_ds.close()
 
         if failed:

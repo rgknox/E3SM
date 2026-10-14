@@ -259,6 +259,7 @@
       <value datm_mode="CLM1PT">CLM1PT.$ATM_GRID</value>
       <value datm_mode="CLMCRUNCEP$">CLMCRUNCEP.Solar,CLMCRUNCEP.Precip,CLMCRUNCEP.TPQW</value>
       <value datm_mode="CLMCRUNCEPv7">CLMCRUNCEPv7.Solar,CLMCRUNCEPv7.Precip,CLMCRUNCEPv7.TPQW</value>
+      <value datm_mode="TRENDY2026">TRENDY2026.Solar,TRENDY2026.Precip,TRENDY2026.TPQW</value>
       <value datm_mode="CLMGSWP3v1">CLMGSWP3v1.Solar,CLMGSWP3v1.Precip,CLMGSWP3v1.TPQW</value>
       <value datm_mode="ELMERA5">ELMERA5.msdrswrf,ELMERA5.msdfswrf,ELMERA5.mcpr,ELMERA5.mlspr,ELMERA5.t2m,ELMERA5.sp,ELMERA5.d2m,ELMERA5.w10,ELMERA5.msdwlwrf</value>
       <value datm_mode="ERA56HR">ERA56HR.msdrswrf,ERA56HR.msdfswrf,ERA56HR.mcpr,ERA56HR.mlspr,ERA56HR.t2m,ERA56HR.sp,ERA56HR.d2m,ERA56HR.w10,ERA56HR.msdwlwrf</value>
@@ -300,6 +301,7 @@
       <value stream="CLM_QIAN">$DIN_LOC_ROOT/atm/datm7</value>
       <value stream="CLMCRUNCEPv7">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.cruncep_qianFill.0.5d.v7.c160715</value>
       <value stream="CLMCRUNCEP">$DIN_LOC_ROOT/share/domains/domain.clm</value>
+      <value stream="TRENDY2026">$DIN_LOC_ROOT_CLMFORC</value>
       <value stream="CLMGSWP3v1">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.GSWP3.0.5d.v1.c170516</value>
       <value stream="ELMERA5">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.ERA.0.25d.v5.c180614</value>
       <value stream="ERA56HR">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.ERA.6HRLY.0.25d.v5.c180614</value>
@@ -378,6 +380,7 @@
       <value stream="CLM_QIAN_WISO">domain.T62.050609.nc</value>
       <value stream="CLMCRUNCEPv7">domain.lnd.360x720_cruncep.130305.nc</value>
       <value stream="CLMCRUNCEP">domain.lnd.360x720.130305.nc</value>
+      <value stream="TRENDY2026">domain.crujra.v2.5_0.5x0.5.c240722.nc</value>
       <value stream="CLMGSWP3v1">domain.lnd.360x720_gswp3.0v1.c170606.nc</value>
       <value stream="CLMGSWP3">domain.lnd.360x720_gswp3.0v1.c170606.nc</value>
       <value stream="ELMERA5">domain.lnd.era5_721x1440_rdrlat_EC30to60E2r2.221115.nc</value>
@@ -578,6 +581,9 @@
       <value stream="CLMCRUNCEPv7.Solar">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.cruncep_qianFill.0.5d.v7.c160715/Solar6Hrly</value>
       <value stream="CLMCRUNCEPv7.Precip">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.cruncep_qianFill.0.5d.v7.c160715/Precip6Hrly</value>
       <value stream="CLMCRUNCEPv7.TPQW">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.cruncep_qianFill.0.5d.v7.c160715/TPHWL6Hrly</value>
+      <value stream="TRENDY2026.Solar">$DIN_LOC_ROOT_CLMFORC</value>
+      <value stream="TRENDY2026.Precip">$DIN_LOC_ROOT_CLMFORC</value>
+      <value stream="TRENDY2026.TPQW">$DIN_LOC_ROOT_CLMFORC</value>      
       <value stream="CLMGSWP3v1.Solar">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.GSWP3.0.5d.v1.c170516/Solar</value>
       <value stream="CLMGSWP3v1.Precip">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.GSWP3.0.5d.v1.c170516/Precip</value>
       <value stream="CLMGSWP3v1.TPQW">$DIN_LOC_ROOT_CLMFORC/atm_forcing.datm7.GSWP3.0.5d.v1.c170516/TPHWL</value>
@@ -706,6 +712,9 @@
       <value  stream="CLMCRUNCEPv7.Solar">clmforc.cruncep.V7.c2016.0.5d.Solr.%ym.nc</value>
       <value  stream="CLMCRUNCEPv7.Precip">clmforc.cruncep.V7.c2016.0.5d.Prec.%ym.nc</value>
       <value  stream="CLMCRUNCEPv7.TPQW">clmforc.cruncep.V7.c2016.0.5d.TPQWL.%ym.nc</value>
+      <value  stream="TRENDY2026.Solar">clmforc.CRUJRAv4.10_0.5x0.5.Solr_Diffuse.%y.nc</value>
+      <value  stream="TRENDY2026.Precip">clmforc.CRUJRAv4.10_0.5x0.5.Prec.%y.nc</value>
+      <value  stream="TRENDY2026.TPQW">clmforc.CRUJRAv4.10_0.5x0.5.TPQWL.%y.nc</value>
       <value  stream="CLMGSWP3v1.Solar">clmforc.GSWP3.c2011.0.5x0.5.Solr.%ym.nc</value>
       <value  stream="CLMGSWP3v1.Precip">clmforc.GSWP3.c2011.0.5x0.5.Prec.%ym.nc</value>
       <value  stream="CLMGSWP3v1.TPQW">clmforc.GSWP3.c2011.0.5x0.5.TPQWL.%ym.nc</value>
@@ -1754,6 +1763,20 @@
         QBOT     shum
         PSRF     pbot
       </value>
+      <value  stream="TRENDY2026.Solar">
+	FSDS_DIRECT swdndr
+        FSDS_DIFFUSE swdndf
+      </value>
+      <value  stream="TRENDY2026.Precip">
+        PRECTmms precn
+      </value>
+      <value  stream="TRENDY2026.TPQW">
+        TBOT     tbot
+        WIND     wind
+        QBOT     shum
+        PSRF     pbot
+	FLDS     lwdn
+      </value>
       <value  stream="CLMGSWP3v1.Solar">
         FSDS swdn
       </value>
@@ -2149,6 +2172,7 @@
       <value stream="CLM_QIAN">$DATM_CLMNCEP_YR_ALIGN</value>
       <value stream="CLMCRUNCEP">$DATM_CLMNCEP_YR_ALIGN</value>
       <value stream="CLMGSWP3">$DATM_CLMNCEP_YR_ALIGN</value>
+      <value stream="TRENDY2026">$DATM_CLMNCEP_YR_ALIGN</value>
       <value stream="ELMERA5">$DATM_CLMNCEP_YR_ALIGN</value>
       <value stream="ERA56HR">$DATM_CLMNCEP_YR_ALIGN</value>
       <value stream="ELMGSWP3w5e5">$DATM_CLMNCEP_YR_ALIGN</value>
@@ -2209,6 +2233,7 @@
       <value stream="CLM_QIAN">$DATM_CLMNCEP_YR_START</value>
       <value stream="CLMCRUNCEP">$DATM_CLMNCEP_YR_START</value>
       <value stream="CLMGSWP3">$DATM_CLMNCEP_YR_START</value>
+      <value stream="TRENDY2026">$DATM_CLMNCEP_YR_START</value>
       <value stream="ELMERA5">$DATM_CLMNCEP_YR_START</value>
       <value stream="ERA56HR">$DATM_CLMNCEP_YR_START</value>
       <value stream="ELMGSWP3w5e5">$DATM_CLMNCEP_YR_START</value>
@@ -2291,6 +2316,7 @@
       <value stream="CLM_QIAN">$DATM_CLMNCEP_YR_END  </value>
       <value stream="CLMCRUNCEP">$DATM_CLMNCEP_YR_END  </value>
       <value stream="CLMGSWP3">$DATM_CLMNCEP_YR_END  </value>
+      <value stream="TRENDY2026">$DATM_CLMNCEP_YR_END </value>
       <value stream="ELMERA5">$DATM_CLMNCEP_YR_END  </value>
       <value stream="ERA56HR">$DATM_CLMNCEP_YR_END  </value>
       <value stream="ELMGSWP3w5e5">$DATM_CLMNCEP_YR_END  </value>
@@ -2463,6 +2489,7 @@
       <value datm_mode="CLM">CLMNCEP</value>
       <value datm_mode="ELMERA5">CLMNCEP</value>
       <value datm_mode="ERA56HR">CLMNCEP</value>
+      <value datm_mode="TRENDY2026">CLMNCEP</value>
       <value datm_mode="uELM">CLMNCEP</value>
       <value datm_mode="ELM">CLMNCEP</value>
       <value datm_mode="CORE2_NYF">CORE2_NYF</value>
@@ -2591,6 +2618,7 @@
       <value stream="CLMCRUNCEP" atm_grid="hcru">copy</value>
       <value stream="CLMGSWP3" atm_grid="hcru">copy</value>
       <value stream="ELMGSWP3w5e5" atm_grid="hcru">copy</value>
+      <value stream="TRENDY2026" atm_grid="hcru">copy</value>
       <value stream="uELM_NA">copy</value>
       <value stream="uELM_TES">copy</value> 
       <value stream="CLMNLDAS2" atm_grid="0.125nldas2">copy</value>
@@ -2676,6 +2704,8 @@
       <value stream="CLMCRUNCEP.Precip">nearest</value>
       <value stream="CLMCRUNCEPv7.Solar">coszen</value>
       <value stream="CLMCRUNCEPv7.Precip">nearest</value>
+      <value stream="TRENDY2026.Solar">coszen</value>
+      <value stream="TRENDY2026.Precip">nearest</value>
       <value stream="CLMGSWP3v1.Solar">coszen</value>
       <value stream="CLMGSWP3v1.Precip">nearest</value>
       <value stream="ELMERA5.msdrswrf">coszen</value>
