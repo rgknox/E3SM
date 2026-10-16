@@ -1,0 +1,38 @@
+{
+    "_comments": [
+        "Configuration file for subset_irregular_metgrid.py.",
+        "Run: python subset_irregular_metgrid.py --config this_file.json [--dry-run] [--yes] [--skip-existing] [--help]",
+	"Documentation: https://docs.google.com/document/d/1tITvdJaxN4rUClm9L3eg-XEnMTNEZY6C9T-MmrNmXRM/edit?usp=sharing",
+
+	"_comment_a_few_datm_modes":"CLMGSWP3v1,TRENDY2026",
+    
+	"_comment_datm_mode_basis":"the name of the met stream that you are using as a basis for regridding",
+	"_comment_din_loc_root":"the path to the root of input data on your machine",
+	"_comment_din_loc_root_clmforc":"the path to the root of the forcing data on your machine",
+	"_comment_new_loc_root":"the path to the root of your newly created data",
+	"_comment_new_loc_root_clmforc":"the path to the root of your newly created stream data",
+	"_comment_stream_list_file":"an xml file that specifies everything about the different datm modes",
+	"_comment_stream_list_file":"  see components/data_comps/datm/cime_config/namelist_definition_datm.xml",
+	"_comment_coords_mode":"points or domain, the former uses a list of points, the latter uses a domain file",
+	"_comment_target_lnd_domain":"full path to the land domain file of the grid on which your simulation",
+	"_comment_target_lnd_domain":"   actually runs (not the domain of the stream data your regridding)."
+	"_comment_target_lnd_domain":"   If points mode, its simply a template, if domain mode it is"
+	"_comment_target_lnd_domain":"   literally the domain you want for your run",
+	"_comment_lat_list":"list of latitude coordinates for points mode",
+	"_comment_lon_list":"list of longitude coordinates for points mode",
+	"_comment_base_surf_files":"base_surf_files: list of surface dataset paths to subset"
+	"_comment_base_surf_files":"   (probably empty list [] if coords_mode=domain)"
+    ],
+    
+    "din_loc_root": "/dvs_ro/cfs/cdirs/e3sm/inputdata/",
+    "din_loc_root_clmforc": "/dvs_ro/cfs/cdirs/e3sm/inputdata/atm/datm7/",
+    "new_loc_root": "/global/cfs/cdirs/m2420/rgknox/site_drivers/ne4_v2/inputdata/",
+    "new_loc_root_clmforc": "/global/cfs/cdirs/m2420/rgknox/site_drivers/ne4_v2",
+    "stream_list_file": "/global/homes/r/rgknox/E3SM/components/data_comps/datm/cime_config/namelist_definition_datm.xml",
+    "datm_mode_basis": "CLM_QIAN",
+    "coords_mode": "domain",
+    "target_lnd_domain": "/dvs_ro/cfs/cdirs/e3sm/inputdata/share/domains/domain.lnd.ne4pg2_oQU240.190321.nc",
+    "lat_list": [null],
+    "lon_list": [null],
+    "base_surf_files": []
+}
