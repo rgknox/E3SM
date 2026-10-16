@@ -1475,6 +1475,7 @@ contains
                    AllocParamsInst%compet_decomp_nh4, &
                    fpi_nh4_vr(fc,j), &
                    actual_immob_nh4_vr(c,j), &
+                   .false., &
                    pot_f_nit_vr(c,j), &
                    AllocParamsInst%compet_nit,  &
                    frac_nh4_to_no3, &
@@ -1497,6 +1498,7 @@ contains
                    AllocParamsInst%compet_decomp_no3, &
                    fpi_no3, &
                    actual_immob_no3_vr(c,j), &
+                   .false., &
                    pot_f_denit_vr(c,j), &
                    AllocParamsInst%compet_denit, &
                    frac_denit, &
@@ -3046,47 +3048,84 @@ contains
   ! ======================================================================================
 
   elemental subroutine RDAllocation(dt, &
-       smin,    &  ! 
+       smin_in,    &  ! 
        demand1, &  ! col_plant_ndemand_vr
        compet1, &  ! compet_plants_nh4
        frac1,    &
        flux1,   &
-       demand2, &  ! potential_immob_vr
+       demand2_in, &  ! potential_immob_vr
        compet2, &  ! compet_decomp_nh4
        frac2,    &
        flux2,   &
+       pref_decomp, & ! logical, if we give priority to decomp
        demand3, &  ! pot_f_nit_vr
        compet3, &  ! compet_nit
        frac3,    &
        flux3)
 
-    real(r8),intent(in)  :: dt    ! timestep length [s]
-    real(r8),intent(in)  :: smin  ! mineralized nutrient concentration [g/m3]
+    real(r8),intent(in)  :: dt      ! timestep length [s]
+    real(r8),intent(in)  :: smin_in  ! mineralized nutrient concentration [g/m3]
     real(r8),intent(in)  :: demand1
     real(r8),intent(in)  :: compet1
-    real(r8),intent(out) :: frac1
-    real(r8),intent(out) :: flux1
-    real(r8),intent(in)  :: demand2
+    real(r8),intent(inout) :: frac1
+    real(r8),intent(inout) :: flux1
+    real(r8),intent(in)  :: demand2_in
     real(r8),intent(in)  :: compet2
-    real(r8),intent(out) :: frac2
-    real(r8),intent(out) :: flux2
+    real(r8),intent(inout) :: frac2
+    real(r8),intent(inout) :: flux2
+    logical, intent(in)    :: pref_decomp
     real(r8),intent(in),  optional :: demand3
     real(r8),intent(in),  optional :: compet3
-    real(r8),intent(out), optional :: frac3
-    real(r8),intent(out), optional :: flux3
+    real(r8),intent(inout), optional :: frac3
+    real(r8),intent(inout), optional :: flux3
 
     ! locals
     logical  :: has_3rd
+    real(r8) :: smin
+    real(r8) :: demand2
     real(r8) :: sum_demand
     real(r8) :: sum_demand_scaled
     real(r8) :: max_smin_rate
 
+    ! Decomposers are the second competitor
+    ! we can optionally allow them to get
+    ! some of their demand first
+
+    smin = smin_in
+    demand2 = min(demand2_in*compet2,demand2_in)
+    
+    if(pref_decomp)then
+       if (demand2*dt < smin) then
+          ! competitive fractions should be below 1, but just in-case...
+          flux2 = demand2
+       else
+          if (demand2 > 0.0_r8 .and. smin > 0.0_r8 ) then
+             max_smin_rate = smin/dt
+             flux2 = min(max_smin_rate,demand2)
+          else
+             flux2 = 0._r8
+          end if
+       end if
+       ! Update the local availability
+       smin = smin - flux2*dt
+       if(demand2_in>0._r8)then
+          frac2 = flux2/demand2_in
+       else
+          frac2 = 0._r8
+       end if
+    else
+       flux2=0._r8
+       frac2=0._r8
+    end if
+    
+    demand2=demand2_in-flux2
+    
     if(present(demand3))then
        has_3rd = .true.
     else
        has_3rd = .false.
     end if
-    
+
     sum_demand        = demand1 + demand2
     sum_demand_scaled = demand1*compet1 + demand2*compet2
 
@@ -3100,7 +3139,7 @@ contains
        frac1 = 1._r8
        frac2 = 1._r8
        flux1 = demand1
-       flux2 = demand2
+       flux2 = flux2+demand2
        if(has_3rd) then
           flux3 = demand3
           frac3  = 1._r8
@@ -3114,13 +3153,12 @@ contains
     if (sum_demand_scaled > 0.0_r8 .and. smin > 0.0_r8 ) then
        max_smin_rate = smin/dt
        frac1 = demand1*compet1/sum_demand_scaled
-       frac2 = demand2*compet2/sum_demand_scaled
        flux1 = min(max_smin_rate*frac1,demand1)
-       flux2 = min(max_smin_rate*frac2,demand2)
        if(demand2>0._r8)then
-          frac2 = flux2/demand2
-       else
-          frac2 = 0._r8
+          frac2 = demand2*compet2/sum_demand_scaled
+          flux2 = flux2+min(max_smin_rate*frac2,demand2)
+          frac2 = flux2/demand2_in
+          ! there is no else, we default to the existing frac2
        end if
        if(demand1>0._r8)then
           frac1 = flux1/demand1
@@ -3139,9 +3177,7 @@ contains
        end if
     else
        flux1 = 0._r8
-       flux2 = 0._r8
        frac1 = 0._r8
-       frac2 = 0._r8
        if(has_3rd)then
           flux3 = 0._r8
           frac3 = 0._r8
