@@ -10,12 +10,12 @@
        This file may have atm desc entries.
   -->
   <description modifier_mode="1">
-    <desc atm="DATM[%QIA][%WISOQIA][%CRU][%CRUv7][%TRNDY26][%GSWP3v1][%DaymetGSWP3][%DaymetERA5][%ERA5][%ERA56HR][%GSWP3w5e5][%MOSARTTEST][%NLDAS2][%CPLHIST][%E3SMWCv2][%CPLWCH][%1PT][%NYF][%IAF][%JRA][%JRA-1p5][%JRA-1p5-2023][%JRA-1p4-2018][%JRA-RYF8485][%JRA-RYF9091][%JRA-RYF0304][%CFSv2][%CFSR]"> Data driven ATM </desc>
+    <desc atm="DATM[%QIA][%WISOQIA][%CRU][%CRUv7][%TRENDY26][%GSWP3v1][%DaymetGSWP3][%DaymetERA5][%ERA5][%ERA56HR][%GSWP3w5e5][%MOSARTTEST][%NLDAS2][%CPLHIST][%E3SMWCv2][%CPLWCH][%1PT][%NYF][%IAF][%JRA][%JRA-1p5][%JRA-1p5-2023][%JRA-1p4-2018][%JRA-RYF8485][%JRA-RYF9091][%JRA-RYF0304][%CFSv2][%CFSR]"> Data driven ATM </desc>
     <desc option="QIA"> QIAN data set </desc>
     <desc option="WISOQIA">QIAN with water isotopes</desc>
     <desc option="CRU"> CRUNCEP data set </desc>
     <desc option="CRUv7"> CLM CRU NCEP v7 data set </desc>
-    <desc option="TRNDY26"> 2026 CRU-JRA data set </desc>
+    <desc option="TRENDY26"> 2026 CRU-JRA data set </desc>
     <desc option="GSWP3v1"> GSWP3v1 data set </desc>
     <desc option="DaymetGSWP3"> Daymet NA data set, sub-daily downscaled with GSWP3 </desc>
     <desc option="DaymetERA5"> Daymet NA data set, sub-daily downscaled with ERA5 for TESSFA project </desc>
@@ -79,7 +79,7 @@ data (see cime issue #3653 -- https://github.com/ESMCI/cime/issues/3653).
       <value compset="%WISOQIA">CLM_QIAN_WISO</value>
       <value compset="%CRU">CLMCRUNCEP</value>
       <value compset="%CRUv7">CLMCRUNCEPv7</value>
-      <value compset="%TRNDY26">TRENDY2026</value>
+      <value compset="%TRENDY26">TRENDY2026</value>
       <value compset="%GSWP3v1">CLMGSWP3v1</value>
       <value compset="%DaymetGSWP3">uELM_NA</value>
       <value compset="%DaymetERA5">uELM_TES</value>
